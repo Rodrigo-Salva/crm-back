@@ -1,0 +1,219 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@crm/auth": [
+        "libs/auth/src"
+      ],
+      "@crm/auth/*": [
+        "libs/auth/src/*"
+      ],
+      "@crm/companies": [
+        "libs/companies/src"
+      ],
+      "@crm/companies/*": [
+        "libs/companies/src/*"
+      ],
+      "@crm/contacts": [
+        "libs/contacts/src"
+      ],
+      "@crm/contacts/*": [
+        "libs/contacts/src/*"
+      ],
+      "@crm/custom-fields": [
+        "libs/custom-fields/src"
+      ],
+      "@crm/custom-fields/*": [
+        "libs/custom-fields/src/*"
+      ],
+      "@crm/pipeline-stages": [
+        "libs/pipeline-stages/src"
+      ],
+      "@crm/pipeline-stages/*": [
+        "libs/pipeline-stages/src/*"
+      ],
+      "@crm/activities": [
+        "libs/activities/src"
+      ],
+      "@crm/activities/*": [
+        "libs/activities/src/*"
+      ],
+      "@crm/notifications": [
+        "libs/notifications/src"
+      ],
+      "@crm/notifications/*": [
+        "libs/notifications/src/*"
+      ],
+      "@crm/email": [
+        "libs/email/src"
+      ],
+      "@crm/email/*": [
+        "libs/email/src/*"
+      ],
+      "@crm/deals": [
+        "libs/deals/src"
+      ],
+      "@crm/deals/*": [
+        "libs/deals/src/*"
+      ],
+      "@crm/email": [
+        "libs/email/src"
+      ],
+      "@crm/email/*": [
+        "libs/email/src/*"
+      ],
+      "@crm/notes": [
+        "libs/notes/src"
+      ],
+      "@crm/notes/*": [
+        "libs/notes/src/*"
+      ],
+      "@crm/shared": [
+        "libs/shared/src"
+      ],
+      "@crm/shared/*": [
+        "libs/shared/src/*"
+      ],
+      "@crm/tasks": [
+        "libs/tasks/src"
+      ],
+      "@crm/tasks/*": [
+        "libs/tasks/src/*"
+      ],
+      "@crm/tenant": [
+        "libs/tenant/src"
+      ],
+      "@crm/tenant/*": [
+        "libs/tenant/src/*"
+      ],
+      "@crm/users": [
+        "libs/users/src"
+      ],
+      "@crm/users/*": [
+        "libs/users/src/*"
+      ],
+      "@crm/automation": [
+        "libs/automation/src"
+      ],
+      "@crm/automation/*": [
+        "libs/automation/src/*"
+      ],
+      "@crm/audit": [
+        "libs/audit/src"
+      ],
+      "@crm/audit/*": [
+        "libs/audit/src/*"
+      ],
+      "@crm/campaigns": [
+        "libs/campaigns/src"
+      ],
+      "@crm/campaigns/*": [
+        "libs/campaigns/src/*"
+      ],
+      "@crm/dashboard": [
+        "libs/dashboard/src"
+      ],
+      "@crm/dashboard/*": [
+        "libs/dashboard/src/*"
+      ],
+      "@crm/products": [
+        "libs/products/src"
+      ],
+      "@crm/products/*": [
+        "libs/products/src/*"
+      ],
+      "@crm/quotes": [
+        "libs/quotes/src"
+      ],
+      "@crm/quotes/*": [
+        "libs/quotes/src/*"
+      ],
+      "@crm/tickets": [
+        "libs/tickets/src"
+      ],
+      "@crm/tickets/*": [
+        "libs/tickets/src/*"
+      ],
+      "@crm/api-keys": [
+        "libs/api-keys/src"
+      ],
+      "@crm/api-keys/*": [
+        "libs/api-keys/src/*"
+      ],
+      "@crm/webhooks": [
+        "libs/webhooks/src"
+      ],
+      "@crm/webhooks/*": [
+        "libs/webhooks/src/*"
+      ],
+      "@crm/whatsapp": [
+        "libs/whatsapp/src"
+      ],
+      "@crm/whatsapp/*": [
+        "libs/whatsapp/src/*"
+      ],
+      "@crm/tenant-settings": [
+        "libs/tenant-settings/src"
+      ],
+      "@crm/tenant-settings/*": [
+        "libs/tenant-settings/src/*"
+      ],
+      "@crm/ai-assistant": [
+        "libs/ai-assistant/src"
+      ],
+      "@crm/ai-assistant/*": [
+        "libs/ai-assistant/src/*"
+      ],
+      "@crm/role-permissions": [
+        "libs/role-permissions/src"
+      ],
+      "@crm/role-permissions/*": [
+        "libs/role-permissions/src/*"
+      ],
+      "@crm/leads": [
+        "libs/leads/src"
+      ],
+      "@crm/leads/*": [
+        "libs/leads/src/*"
+      ],
+      "@crm/uploads": [
+        "libs/uploads/src"
+      ],
+      "@crm/uploads/*": [
+        "libs/uploads/src/*"
+      ],
+      "@crm/teams": [
+        "libs/teams/src"
+      ],
+      "@crm/teams/*": [
+        "libs/teams/src/*"
+      ],
+      "@crm/time-tracking": [
+        "libs/time-tracking/src"
+      ],
+      "@crm/time-tracking/*": [
+        "libs/time-tracking/src/*"
+      ]
+    }
+  }
+}

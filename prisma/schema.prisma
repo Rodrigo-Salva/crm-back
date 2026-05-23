@@ -1,0 +1,931 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  superadmin
+  admin
+  seller
+  reader
+}
+
+enum TenantStatus {
+  active
+  inactive
+  suspended
+}
+
+enum ContactStatus {
+  new
+  contacted
+  qualified
+  lost
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+enum Currency {
+  MXN
+  USD
+  EUR
+  CAD
+  GBP
+  ARS
+  CLP
+  COP
+  PEN
+  BRL
+}
+
+enum ActivityType {
+  call
+  meeting
+  email
+  note
+  task
+}
+
+enum EmailDirection {
+  inbound
+  outbound
+}
+
+enum CampaignStatus {
+  draft
+  sending
+  sent
+  cancelled
+}
+
+enum QuoteStatus {
+  draft
+  sent
+  approved
+  rejected
+  converted
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  slug      String       @unique
+  domain    String?      @unique
+  status    TenantStatus @default(active)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  users                 User[]
+  contacts              Contact[]
+  deals                 Deal[]
+  tasks                 Task[]
+  companies             Company[]
+  notes                 Note[]
+  emails                Email[]
+  customFieldDefinitions CustomFieldDefinition[]
+  pipelineStages        PipelineStage[]
+  activities            Activity[]
+  emailTemplates        EmailTemplate[]
+  smtpConfig            SmtpConfig?
+  automationRules       AutomationRule[]
+  auditLogs             AuditLog[]
+  campaigns             Campaign[]
+  imapConfig            ImapConfig?
+  products              Product[]
+  priceLists            PriceList[]
+  discounts             Discount[]
+  quotes                Quote[]
+  tickets               Ticket[]
+  apiKeys               ApiKey[]
+  webhooks              Webhook[]
+  tenantSettings        TenantSetting[]
+  whatsappConfig        WhatsappConfig?
+  aiSuggestions         AiSuggestion[]
+  rolePermissions       RolePermission[]
+  leads                 Lead[]
+  fileAttachments       FileAttachment[]
+  teams                 Team[]
+  timeEntries           TimeEntry[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatar    String?
+  role      UserRole @default(seller)
+  tenantId  String   @map("tenant_id")
+  
+  // Security & SSO fields
+  ssoProvider        String?  @map("sso_provider")
+  ssoId              String?  @map("sso_id")
+  twoFactorSecret    String?  @map("two_factor_secret")
+  isTwoFactorEnabled Boolean  @default(false) @map("is_two_factor_enabled")
+  googleRefreshToken String?  @map("google_refresh_token")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  contacts  Contact[]
+  deals     Deal[]
+  tasks     Task[]
+  companies Company[]
+  notes     Note[]
+  activities Activity[]
+  notifications Notification[]
+  reminders Reminder[]
+  auditLogs AuditLog[]
+  quotes     Quote[]
+  ticketsAssigned Ticket[]
+  approvalRequests ApprovalRequest[]
+  approvalActions ApprovalAction[]
+  ticketMessages TicketMessage[]
+  leads          Lead[]
+  fileUploads    FileAttachment[]
+  teamMembers    TeamMember[]
+  timeEntries    TimeEntry[]
+
+  @@unique([email, tenantId])
+  @@map("users")
+}
+
+model RolePermission {
+  id         String   @id @default(uuid())
+  role       UserRole
+  permission String
+  tenantId   String   @map("tenant_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([role, permission, tenantId])
+  @@map("role_permissions")
+}
+
+model Contact {
+  id           String        @id @default(uuid())
+  name         String
+  email        String
+  phone        String?
+  companyName  String?       @map("company_name")
+  position     String?
+  status       ContactStatus @default(new)
+  customFields Json?         @map("custom_fields")
+  companyId    String?       @map("company_id")
+  ownerId      String        @map("owner_id")
+  tenantId     String        @map("tenant_id")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  owner   User    @relation(fields: [ownerId], references: [id])
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  company    Company? @relation(fields: [companyId], references: [id])
+  deals      Deal[]
+  activities Activity[]
+  emails     Email[]
+  campaignRecipients CampaignRecipient[]
+  tickets    Ticket[]
+  quotes     Quote[]
+  portalPassword String? @map("portal_password")
+  teamId     String?  @map("team_id")
+  team       Team?    @relation(fields: [teamId], references: [id])
+
+  @@map("contacts")
+}
+
+model Deal {
+  id                String    @id @default(uuid())
+  title             String
+  value             Float      @default(0)
+  currency          Currency   @default(MXN)
+  stage             String     @default("lead")
+  contactId         String    @map("contact_id")
+  ownerId           String    @map("owner_id")
+  tenantId          String    @map("tenant_id")
+  expectedCloseDate DateTime? @map("expected_close_date")
+  convertedFromLead Boolean   @default(false) @map("converted_from_lead")
+  convertedFromId   String?   @map("converted_from_id")
+  customFields      Json?     @map("custom_fields")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  contact    Contact    @relation(fields: [contactId], references: [id])
+  owner      User       @relation(fields: [ownerId], references: [id])
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  activities Activity[]
+  quotes     Quote[]
+  teamId     String?    @map("team_id")
+  team       Team?      @relation(fields: [teamId], references: [id])
+
+  @@map("deals")
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(pending)
+  priority    TaskPriority @default(medium)
+  dueDate     DateTime?    @map("due_date")
+  assigneeId  String       @map("assignee_id")
+  tenantId    String       @map("tenant_id")
+  relatedType String?      @map("related_type")
+  relatedId   String?      @map("related_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  assignee   User         @relation(fields: [assigneeId], references: [id])
+  tenant     Tenant       @relation(fields: [tenantId], references: [id])
+  teamId     String?      @map("team_id")
+  team       Team?        @relation(fields: [teamId], references: [id])
+  timeEntries TimeEntry[]
+
+  @@map("tasks")
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  industry  String?
+  website   String?
+  phone     String?
+  address   String?
+  ownerId   String   @map("owner_id")
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customFields Json? @map("custom_fields")
+  owner       User   @relation(fields: [ownerId], references: [id])
+  tenant      Tenant @relation(fields: [tenantId], references: [id])
+  contacts    Contact[]
+
+  @@map("companies")
+}
+
+model Note {
+  id          String   @id @default(uuid())
+  content     String
+  authorId    String   @map("author_id")
+  tenantId    String   @map("tenant_id")
+  relatedType String   @map("related_type")
+  relatedId   String   @map("related_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  author User   @relation(fields: [authorId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("notes")
+}
+
+model Reminder {
+  id         String   @id @default(uuid())
+  activityId String  @map("activity_id")
+  userId     String  @map("user_id")
+  minutesBefore Int  @default(15) @map("minutes_before")
+  sent       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  activity Activity @relation(fields: [activityId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("reminders")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String
+  body      String?
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  subject   String
+  body      String
+  tenantId  String?  @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  campaigns Campaign[]
+
+  @@unique([name, tenantId])
+  @@map("email_templates")
+}
+
+model SmtpConfig {
+  id       String @id @default(uuid())
+  host     String
+  port     Int     @default(587)
+  username String
+  password String
+  fromEmail String @map("from_email")
+  fromName String  @map("from_name")
+  tenantId String  @unique @map("tenant_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("smtp_configs")
+}
+
+model Email {
+  id         String          @id @default(uuid())
+  direction  EmailDirection  @default(outbound)
+  subject    String
+  body       String
+  fromEmail  String          @map("from_email")
+  toEmail    String          @map("to_email")
+  contactId  String?         @map("contact_id")
+  tenantId   String          @map("tenant_id")
+  trackingId String?         @unique @map("tracking_id")
+  openedAt   DateTime?       @map("opened_at")
+  messageId  String?         @map("message_id")
+  inReplyTo  String?         @map("in_reply_to")
+  sentAt     DateTime        @default(now()) @map("sent_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id])
+  contact Contact?          @relation(fields: [contactId], references: [id])
+
+  @@map("emails")
+}
+
+model ImapConfig {
+  id       String @id @default(uuid())
+  host     String
+  port     Int     @default(993)
+  username String
+  password String
+  useTLS   Boolean @default(true)
+  tenantId String  @unique @map("tenant_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("imap_configs")
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  name            String
+  subject         String
+  body            String
+  templateId      String?        @map("template_id")
+  tenantId        String         @map("tenant_id")
+  status          CampaignStatus @default(draft)
+  totalRecipients Int            @default(0)
+  sentCount       Int            @default(0)
+  openedCount     Int            @default(0)
+  scheduledAt     DateTime?      @map("scheduled_at")
+  sentAt          DateTime?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  template   EmailTemplate?      @relation(fields: [templateId], references: [id])
+  recipients CampaignRecipient[]
+
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  contactId  String   @map("contact_id")
+  email      String
+  sent       Boolean  @default(false)
+  opened     Boolean  @default(false)
+  openedAt   DateTime?
+  sentAt     DateTime?
+  error      String?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  contact  Contact  @relation(fields: [contactId], references: [id])
+
+  @@map("campaign_recipients")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("password_reset_tokens")
+}
+
+model CustomFieldDefinition {
+  id         String   @id @default(uuid())
+  name       String
+  label      String
+  type       String   @default("text")
+  entity     String
+  required   Boolean  @default(false)
+  options    Json?
+  order      Int      @default(0)
+  tenantId   String   @map("tenant_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([name, entity, tenantId])
+  @@map("custom_field_definitions")
+}
+
+model PipelineStage {
+  id        String   @id @default(uuid())
+  name      String
+  order     Int      @default(0)
+  color     String   @default("#6366f1")
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([name, tenantId])
+  @@map("pipeline_stages")
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  type        ActivityType
+  subject     String
+  description String?
+  dueDate     DateTime?    @map("due_date")
+  done        Boolean      @default(false)
+  contactId   String?      @map("contact_id")
+  dealId      String?      @map("deal_id")
+  ownerId     String       @map("owner_id")
+  tenantId    String       @map("tenant_id")
+  googleCalendarEventId String? @map("google_calendar_event_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  contact Contact? @relation(fields: [contactId], references: [id])
+  deal    Deal?    @relation(fields: [dealId], references: [id])
+  owner   User     @relation(fields: [ownerId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  reminders Reminder[]
+
+  @@map("activities")
+}
+
+model AutomationRule {
+  id         String   @id @default(uuid())
+  name       String
+  event      String
+  conditions Json?
+  actions    Json?
+  active     Boolean  @default(true)
+  order      Int      @default(0)
+  tenantId   String   @map("tenant_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("automation_rules")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entity     String
+  entityId   String   @map("entity_id")
+  action     String
+  changes    Json?
+  userId     String   @map("user_id")
+  tenantId   String   @map("tenant_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float    @default(0)
+  currency    Currency @default(MXN)
+  unit        String   @default("unit")
+  category    String?
+  sku         String?
+  tenantId    String   @map("tenant_id")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  priceListItems PriceListItem[]
+  quoteLineItems QuoteLineItem[]
+
+  @@unique([sku, tenantId])
+  @@map("products")
+}
+
+model PriceList {
+  id        String   @id @default(uuid())
+  name      String
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  items    PriceListItem[]
+
+  @@unique([name, tenantId])
+  @@map("price_lists")
+}
+
+model PriceListItem {
+  id          String   @id @default(uuid())
+  priceListId String   @map("price_list_id")
+  productId   String   @map("product_id")
+  customPrice Float?   @map("custom_price")
+  currency    Currency @default(MXN)
+
+  priceList PriceList @relation(fields: [priceListId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([priceListId, productId])
+  @@map("price_list_items")
+}
+
+model Discount {
+  id         String   @id @default(uuid())
+  name       String
+  percentage Float
+  minQuantity Int?    @default(1) @map("min_quantity")
+  productId  String?  @map("product_id")
+  tenantId   String   @map("tenant_id")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("discounts")
+}
+
+model Quote {
+  id            String      @id @default(uuid())
+  number        String      @unique
+  dealId        String?     @map("deal_id")
+  contactId     String?     @map("contact_id")
+  status        QuoteStatus @default(draft)
+  currency      Currency    @default(MXN)
+  subtotal      Float       @default(0)
+  discountTotal Float       @default(0)
+  taxTotal      Float       @default(0)
+  grandTotal    Float       @default(0)
+  notes         String?
+  version       Int         @default(1)
+  discountPercent Float?    @map("discount_percent")
+  createdById   String      @map("created_by_id")
+  tenantId      String      @map("tenant_id")
+  stripePaymentIntentId String? @map("stripe_payment_intent_id")
+  stripePaymentUrl      String? @map("stripe_payment_url")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  deal     Deal?            @relation(fields: [dealId], references: [id])
+  contact  Contact?         @relation(fields: [contactId], references: [id])
+  createdBy User            @relation(fields: [createdById], references: [id])
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  items    QuoteLineItem[]
+  versions QuoteVersion[]
+  approvalRequest ApprovalRequest?
+
+  @@map("quotes")
+}
+
+model QuoteLineItem {
+  id              String   @id @default(uuid())
+  quoteId         String   @map("quote_id")
+  productId       String?  @map("product_id")
+  description     String
+  quantity        Float    @default(1)
+  unitPrice       Float    @default(0)
+  currency        Currency @default(MXN)
+  discountPercent Float    @default(0) @map("discount_percent")
+  total           Float    @default(0)
+
+  quote   Quote    @relation(fields: [quoteId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@map("quote_line_items")
+}
+
+model QuoteVersion {
+  id            String   @id @default(uuid())
+  quoteId       String   @map("quote_id")
+  versionNumber Int      @map("version_number")
+  data          Json
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  quote Quote @relation(fields: [quoteId], references: [id])
+
+  @@unique([quoteId, versionNumber])
+  @@map("quote_versions")
+}
+
+model ApprovalRequest {
+  id          String         @id @default(uuid())
+  quoteId     String         @unique @map("quote_id")
+  reason      String
+  requestedBy String         @map("requested_by")
+  status      ApprovalStatus @default(pending)
+  discountPercent Float      @map("discount_percent")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  quote       Quote           @relation(fields: [quoteId], references: [id])
+  requester   User            @relation(fields: [requestedBy], references: [id])
+  actions     ApprovalAction[]
+
+  @@map("approval_requests")
+}
+
+model ApprovalAction {
+  id                String         @id @default(uuid())
+  approvalRequestId String         @map("approval_request_id")
+  action            ApprovalStatus
+  comment           String?
+  userId            String         @map("user_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id])
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@map("approval_actions")
+}
+
+model Ticket {
+  id          String        @id @default(uuid())
+  number      Int           @default(autoincrement())
+  subject     String
+  description String?
+  status      TicketStatus  @default(open)
+  priority    TicketPriority @default(medium)
+  contactId   String?       @map("contact_id")
+  assignedTo  String?       @map("assigned_to")
+  tenantId    String        @map("tenant_id")
+  customFields Json?        @map("custom_fields")
+  slaDeadline DateTime?     @map("sla_deadline")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  contact     Contact?       @relation(fields: [contactId], references: [id])
+  assignee    User?          @relation(fields: [assignedTo], references: [id])
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  messages    TicketMessage[]
+  teamId      String?        @map("team_id")
+  team        Team?          @relation(fields: [teamId], references: [id])
+
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  authorId  String?  @map("author_id")
+  content   String
+  isInternal Boolean @default(false) @map("is_internal")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  author User?  @relation(fields: [authorId], references: [id])
+
+  @@map("ticket_messages")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  name       String
+  key        String    @unique
+  tenantId   String    @map("tenant_id")
+  active     Boolean   @default(true)
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id        String   @id @default(uuid())
+  url       String
+  events    Json
+  secret    String?
+  active    Boolean  @default(true)
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  logs   WebhookLog[]
+
+  @@map("webhooks")
+}
+
+model WebhookLog {
+  id         String   @id @default(uuid())
+  webhookId  String   @map("webhook_id")
+  event      String
+  payload    Json
+  status     Int?
+  response   String?
+  retries    Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id])
+
+  @@map("webhook_logs")
+}
+
+model TenantSetting {
+  id       String @id @default(uuid())
+  key      String
+  value    String
+  tenantId String @map("tenant_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([key, tenantId])
+  @@map("tenant_settings")
+}
+
+model WhatsappConfig {
+  id             String @id @default(uuid())
+  phoneNumberId  String @map("phone_number_id")
+  accessToken    String @map("access_token")
+  businessId     String @map("business_id")
+  tenantId       String @unique @map("tenant_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("whatsapp_configs")
+}
+
+model AiSuggestion {
+  id        String   @id @default(uuid())
+  entity    String
+  entityId  String   @map("entity_id")
+  suggestion String
+  category  String?
+  applied   Boolean  @default(false)
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("ai_suggestions")
+}
+
+model Lead {
+  id          String   @id @default(uuid())
+  name        String
+  email       String?
+  phone       String?
+  company     String?
+  source      String   @default("web")
+  status      String   @default("new")
+  score       Int      @default(0)
+  notes       String?
+  ownerId     String   @map("owner_id")
+  tenantId    String   @map("tenant_id")
+  convertedContactId String? @map("converted_contact_id")
+  convertedDealId    String? @map("converted_deal_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  owner  User     @relation(fields: [ownerId], references: [id])
+  tenant Tenant   @relation(fields: [tenantId], references: [id])
+  teamId String?  @map("team_id")
+  team   Team?    @relation(fields: [teamId], references: [id])
+
+  @@map("leads")
+}
+
+model FileAttachment {
+  id          String   @id @default(uuid())
+  fileName    String   @map("file_name")
+  originalName String  @map("original_name")
+  mimeType    String   @map("mime_type")
+  size        Int
+  entity      String
+  entityId    String   @map("entity_id")
+  uploadedById String  @map("uploaded_by_id")
+  tenantId    String   @map("tenant_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  uploadedBy User   @relation(fields: [uploadedById], references: [id])
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("file_attachments")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  tenantId    String   @map("tenant_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  members  TeamMember[]
+  contacts Contact[]
+  deals    Deal[]
+  tickets  Ticket[]
+  tasks    Task[]
+  leads    Lead[]
+
+  @@unique([name, tenantId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String   @map("team_id")
+  userId    String   @map("user_id")
+  role      String   @default("member")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model TimeEntry {
+  id          String   @id @default(uuid())
+  taskId      String   @map("task_id")
+  userId      String   @map("user_id")
+  description String?
+  duration    Int      @default(0)
+  date        DateTime @default(now())
+  tenantId    String   @map("tenant_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("time_entries")
+}
