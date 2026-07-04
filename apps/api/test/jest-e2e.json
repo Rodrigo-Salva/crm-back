@@ -1,0 +1,51 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(otplib|@otplib|@scure|@noble|uuid)/)"
+  ],
+  "moduleNameMapper": {
+    "^@crm/auth(|/.*)$": "<rootDir>/../../../libs/auth/src/$1",
+    "^@crm/companies(|/.*)$": "<rootDir>/../../../libs/companies/src/$1",
+    "^@crm/email(|/.*)$": "<rootDir>/../../../libs/email/src/$1",
+    "^@crm/notes(|/.*)$": "<rootDir>/../../../libs/notes/src/$1",
+    "^@crm/shared(|/.*)$": "<rootDir>/../../../libs/shared/src/$1",
+    "^@crm/tasks(|/.*)$": "<rootDir>/../../../libs/tasks/src/$1",
+    "^@crm/tenant(|/.*)$": "<rootDir>/../../../libs/tenant/src/$1",
+    "^@crm/users(|/.*)$": "<rootDir>/../../../libs/users/src/$1",
+    "^@crm/automation(|/.*)$": "<rootDir>/../../../libs/automation/src/$1",
+    "^@crm/audit(|/.*)$": "<rootDir>/../../../libs/audit/src/$1",
+    "^@crm/campaigns(|/.*)$": "<rootDir>/../../../libs/campaigns/src/$1",
+    "^@crm/marketing-campaigns(|/.*)$": "<rootDir>/../../../libs/marketing-campaigns/src/$1",
+    "^@crm/sales-goals(|/.*)$": "<rootDir>/../../../libs/sales-goals/src/$1",
+    "^@crm/lead-forms(|/.*)$": "<rootDir>/../../../libs/lead-forms/src/$1",
+    "^@crm/dashboard(|/.*)$": "<rootDir>/../../../libs/dashboard/src/$1",
+    "^@crm/products(|/.*)$": "<rootDir>/../../../libs/products/src/$1",
+    "^@crm/quotes(|/.*)$": "<rootDir>/../../../libs/quotes/src/$1",
+    "^@crm/tickets(|/.*)$": "<rootDir>/../../../libs/tickets/src/$1",
+    "^@crm/api-keys(|/.*)$": "<rootDir>/../../../libs/api-keys/src/$1",
+    "^@crm/webhooks(|/.*)$": "<rootDir>/../../../libs/webhooks/src/$1",
+    "^@crm/whatsapp(|/.*)$": "<rootDir>/../../../libs/whatsapp/src/$1",
+    "^@crm/tenant-settings(|/.*)$": "<rootDir>/../../../libs/tenant-settings/src/$1",
+    "^@crm/ai-assistant(|/.*)$": "<rootDir>/../../../libs/ai-assistant/src/$1",
+    "^@crm/activities(|/.*)$": "<rootDir>/../../../libs/activities/src/$1",
+    "^@crm/custom-fields(|/.*)$": "<rootDir>/../../../libs/custom-fields/src/$1",
+    "^@crm/leads(|/.*)$": "<rootDir>/../../../libs/leads/src/$1",
+    "^@crm/notifications(|/.*)$": "<rootDir>/../../../libs/notifications/src/$1",
+    "^@crm/pipeline-stages(|/.*)$": "<rootDir>/../../../libs/pipeline-stages/src/$1",
+    "^@crm/role-permissions(|/.*)$": "<rootDir>/../../../libs/role-permissions/src/$1",
+    "^@crm/teams(|/.*)$": "<rootDir>/../../../libs/teams/src/$1",
+    "^@crm/time-tracking(|/.*)$": "<rootDir>/../../../libs/time-tracking/src/$1",
+    "^@crm/uploads(|/.*)$": "<rootDir>/../../../libs/uploads/src/$1",
+    "^@crm/payments(|/.*)$": "<rootDir>/../../../libs/payments/src/$1",
+    "^@crm/contracts(|/.*)$": "<rootDir>/../../../libs/contracts/src/$1",
+    "^@crm/subscriptions(|/.*)$": "<rootDir>/../../../libs/subscriptions/src/$1",
+    "^@crm/playbooks(|/.*)$": "<rootDir>/../../../libs/playbooks/src/$1",
+    "^@crm/public-api(|/.*)$": "<rootDir>/../../../libs/public-api/src/$1"
+  }
+}
