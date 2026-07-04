@@ -25,10 +25,10 @@ export class CampaignsService {
         templateId: dto.templateId,
         tenantId,
         status: 'draft',
-        totalRecipients: dto.contactIds.length,
+        totalRecipients: dto.leadIds.length,
         recipients: {
-          create: dto.contactIds.map((contactId) => ({
-            contactId,
+          create: dto.leadIds.map((leadId) => ({
+            leadId,
             email: '',
           })),
         },
@@ -36,14 +36,14 @@ export class CampaignsService {
       include: { recipients: true },
     });
 
-    const contacts = await this.prisma.contact.findMany({
-      where: { id: { in: dto.contactIds }, tenantId },
+    const leads = await this.prisma.lead.findMany({
+      where: { id: { in: dto.leadIds }, tenantId },
       select: { id: true, email: true },
     });
 
-    const emailMap = new Map(contacts.map((c) => [c.id, c.email]));
+    const emailMap = new Map(leads.map((l) => [l.id, l.email]));
     for (const recipient of campaign.recipients) {
-      const email = emailMap.get(recipient.contactId);
+      const email = emailMap.get(recipient.leadId);
       if (email) {
         await this.prisma.campaignRecipient.update({
           where: { id: recipient.id },
@@ -55,9 +55,11 @@ export class CampaignsService {
     return campaign;
   }
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string, search?: string) {
+    const where: any = { tenantId };
+    if (search) where.name = { contains: search, mode: 'insensitive' };
     return this.prisma.campaign.findMany({
-      where: { tenantId },
+      where,
       include: { _count: { select: { recipients: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -68,12 +70,58 @@ export class CampaignsService {
       where: { id, tenantId },
       include: {
         recipients: {
-          include: { contact: { select: { id: true, name: true, email: true } } },
+          include: { lead: { select: { id: true, name: true, email: true } } },
         },
       },
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
     return campaign;
+  }
+
+  async update(
+    id: string,
+    dto: { name?: string; subject?: string; body?: string; leadIds?: string[] },
+    tenantId: string,
+  ) {
+    const campaign = await this.findById(id, tenantId);
+    if (campaign.status !== 'draft') throw new BadRequestException('Only draft campaigns can be edited');
+
+    const { leadIds, ...rest } = dto;
+
+    if (leadIds) {
+      const currentIds = campaign.recipients.map((r) => r.leadId);
+      const toRemove = currentIds.filter((lid) => !leadIds.includes(lid));
+      const toAdd = leadIds.filter((lid) => !currentIds.includes(lid));
+
+      if (toRemove.length) {
+        await this.prisma.campaignRecipient.deleteMany({
+          where: { campaignId: id, leadId: { in: toRemove } },
+        });
+      }
+      if (toAdd.length) {
+        const leads = await this.prisma.lead.findMany({
+          where: { id: { in: toAdd }, tenantId },
+          select: { id: true, email: true },
+        });
+        await this.prisma.campaignRecipient.createMany({
+          data: leads.map((l) => ({ campaignId: id, leadId: l.id, email: l.email || '' })),
+        });
+      }
+
+      await this.prisma.campaign.update({
+        where: { id },
+        data: { totalRecipients: leadIds.length },
+      });
+    }
+
+    return this.prisma.campaign.update({ where: { id }, data: rest });
+  }
+
+  async remove(id: string, tenantId: string) {
+    const campaign = await this.findById(id, tenantId);
+    if (campaign.status === 'sending') throw new BadRequestException('Cannot delete a campaign while sending');
+    await this.prisma.campaignRecipient.deleteMany({ where: { campaignId: id } });
+    return this.prisma.campaign.delete({ where: { id } });
   }
 
   async send(id: string, tenantId: string) {

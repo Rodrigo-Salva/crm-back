@@ -16,9 +16,28 @@ export class CreateCampaignDto {
 
   @IsArray()
   @IsString({ each: true })
-  contactIds: string[];
+  leadIds: string[];
 
   @IsDateString()
   @IsOptional()
   scheduledAt?: string;
+}
+
+export class UpdateCampaignDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  subject?: string;
+
+  @IsString()
+  @IsOptional()
+  body?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  leadIds?: string[];
 }
