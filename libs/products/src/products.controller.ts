@@ -2,20 +2,22 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } f
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '@crm/auth';
 import { ProductsService } from './products.service';
+import { CreateProductDto, UpdateProductDto, CreatePriceListDto, CreateDiscountDto } from './dto/create-product.dto';
+import { PermissionsGuard } from '@crm/role-permissions';
 
 @Controller()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class ProductsController {
   constructor(private readonly service: ProductsService) {}
 
   @Post('products')
-  create(@Body() dto: any, @CurrentUser() user: any) {
+  create(@Body() dto: CreateProductDto, @CurrentUser() user: any) {
     return this.service.create(dto, user.tenantId);
   }
 
   @Get('products')
-  findAll(@Query('category') category: string, @CurrentUser() user: any) {
-    return this.service.findAll(user.tenantId, category);
+  findAll(@Query('category') category: string, @Query('search') search: string, @CurrentUser() user: any) {
+    return this.service.findAll(user.tenantId, category, search);
   }
 
   @Get('products/categories')
@@ -29,7 +31,7 @@ export class ProductsController {
   }
 
   @Patch('products/:id')
-  update(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto, @CurrentUser() user: any) {
     return this.service.update(id, dto, user.tenantId);
   }
 
@@ -39,7 +41,7 @@ export class ProductsController {
   }
 
   @Post('price-lists')
-  createPriceList(@Body() dto: any, @CurrentUser() user: any) {
+  createPriceList(@Body() dto: CreatePriceListDto, @CurrentUser() user: any) {
     return this.service.createPriceList(dto, user.tenantId);
   }
 
@@ -49,7 +51,7 @@ export class ProductsController {
   }
 
   @Post('discounts')
-  createDiscount(@Body() dto: any, @CurrentUser() user: any) {
+  createDiscount(@Body() dto: CreateDiscountDto, @CurrentUser() user: any) {
     return this.service.createDiscount(dto, user.tenantId);
   }
 

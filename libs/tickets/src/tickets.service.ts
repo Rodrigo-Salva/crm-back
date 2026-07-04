@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '@crm/shared';
+import { PrismaService, RealtimeGateway } from '@crm/shared';
 import { AutomationService } from '@crm/automation';
 import { AuditService } from '@crm/audit';
 import { WebhooksService } from '@crm/webhooks';
+import { NotificationsService } from '@crm/notifications';
 
 @Injectable()
 export class TicketsService {
@@ -13,7 +14,14 @@ export class TicketsService {
     private readonly automation: AutomationService,
     private readonly audit: AuditService,
     private readonly webhooks: WebhooksService,
+    private readonly notifications: NotificationsService,
+    private readonly realtime: RealtimeGateway,
   ) {}
+
+  private async notifyAssignee(assignedTo: string, title: string, body: string, link: string) {
+    const notification = await this.notifications.create({ userId: assignedTo, title, body, link });
+    this.realtime.notifyUser(assignedTo, 'notification:new', notification);
+  }
 
   async create(dto: any, userId: string, tenantId: string) {
     const slaHours: Record<string, number> = { low: 72, medium: 48, high: 24, critical: 8 };
@@ -25,33 +33,42 @@ export class TicketsService {
         subject: dto.subject,
         description: dto.description,
         priority: dto.priority || 'medium',
-        contactId: dto.contactId,
+        leadId: dto.leadId,
         assignedTo: dto.assignedTo,
         tenantId,
         slaDeadline,
       },
-      include: { contact: { select: { id: true, name: true, email: true } } },
+      include: { lead: { select: { id: true, name: true, email: true } } },
     });
 
     await this.audit.log({
       entity: 'ticket', entityId: ticket.id, action: 'created',
-      changes: { subject: dto.subject, priority: dto.priority, contactId: dto.contactId },
+      changes: { subject: dto.subject, priority: dto.priority, leadId: dto.leadId },
       userId, tenantId,
     });
     await this.automation.evaluate('ticket.created', { ...ticket, entity: 'ticket', entityId: ticket.id }, tenantId);
     await this.webhooks.emit('ticket.created', { ...ticket, entity: 'ticket', entityId: ticket.id }, tenantId);
 
+    if (ticket.assignedTo && ticket.assignedTo !== userId) {
+      await this.notifyAssignee(
+        ticket.assignedTo,
+        'Nuevo ticket asignado',
+        ticket.subject,
+        `/tickets/${ticket.id}`,
+      );
+    }
+
     return ticket;
   }
 
-  async findAll(tenantId: string, status?: string, contactId?: string) {
+  async findAll(tenantId: string, status?: string, leadId?: string) {
     const where: any = { tenantId };
     if (status) where.status = status;
-    if (contactId) where.contactId = contactId;
+    if (leadId) where.leadId = leadId;
     return this.prisma.ticket.findMany({
       where,
       include: {
-        contact: { select: { id: true, name: true, email: true } },
+        lead: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true } },
         _count: { select: { messages: true } },
       },
@@ -59,13 +76,13 @@ export class TicketsService {
     });
   }
 
-  async findById(id: string, tenantId: string, contactId?: string) {
+  async findById(id: string, tenantId: string, leadId?: string) {
     const where: any = { id, tenantId };
-    if (contactId) where.contactId = contactId;
+    if (leadId) where.leadId = leadId;
     const ticket = await this.prisma.ticket.findFirst({
       where,
       include: {
-        contact: { select: { id: true, name: true, email: true, portalPassword: true } },
+        lead: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true, email: true } },
         messages: {
           include: { author: { select: { id: true, name: true } } },
@@ -83,10 +100,19 @@ export class TicketsService {
 
     await this.audit.log({
       entity: 'ticket', entityId: id, action: 'updated',
-      changes: dto, userId: before.assignedTo || before.contactId || '', tenantId,
+      changes: dto, userId: before.assignedTo || before.leadId || '', tenantId,
     });
     await this.automation.evaluate('ticket.updated', { ...updated, entity: 'ticket', entityId: id }, tenantId);
     await this.webhooks.emit('ticket.updated', { ...updated, entity: 'ticket', entityId: id }, tenantId);
+
+    if (dto.assignedTo && dto.assignedTo !== before.assignedTo) {
+      await this.notifyAssignee(
+        dto.assignedTo,
+        'Ticket asignado',
+        updated.subject,
+        `/tickets/${updated.id}`,
+      );
+    }
 
     return updated;
   }
@@ -119,13 +145,13 @@ export class TicketsService {
   }
 
   async createFromEmail(from: string, subject: string, body: string, tenantId: string) {
-    const contact = await this.prisma.contact.findFirst({
+    const lead = await this.prisma.lead.findFirst({
       where: { tenantId, email: { equals: from, mode: 'insensitive' } },
     });
 
     const ticket = await this.create(
-      { subject: `[Email] ${subject}`, description: body.substring(0, 2000), contactId: contact?.id },
-      contact?.ownerId || '',
+      { subject: `[Email] ${subject}`, description: body.substring(0, 2000), leadId: lead?.id },
+      lead?.ownerId || '',
       tenantId,
     );
 

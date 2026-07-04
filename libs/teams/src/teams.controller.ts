@@ -1,15 +1,17 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard } from '@crm/role-permissions';
 import { TeamsService } from './teams.service';
+import { CreateTeamDto, UpdateTeamDto } from './dto/create-team.dto';
 
 @Controller('teams')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class TeamsController {
   constructor(private readonly service: TeamsService) {}
 
   @Post()
-  create(@Body() dto: { name: string; description?: string; memberIds?: string[] }, @CurrentUser() user: any) {
+  create(@Body() dto: CreateTeamDto, @CurrentUser() user: any) {
     return this.service.create(dto, user.tenantId);
   }
 
@@ -29,7 +31,7 @@ export class TeamsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: { name?: string; description?: string }, @CurrentUser() user: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateTeamDto, @CurrentUser() user: any) {
     return this.service.update(id, dto, user.tenantId);
   }
 

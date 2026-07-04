@@ -12,7 +12,8 @@ export class CreateImapConfigDto {
   username: string;
 
   @IsString()
-  password: string;
+  @IsOptional()
+  password?: string;
 
   @IsBoolean()
   @IsOptional()

@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
+import { RolePermissionsModule } from '@crm/role-permissions';
 
 @Module({
+  imports: [RolePermissionsModule],
   controllers: [ProductsController],
   providers: [ProductsService],
   exports: [ProductsService],

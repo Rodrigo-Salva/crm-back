@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Put, Body, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard, RequirePermission } from '@crm/role-permissions';
 import { EmailService } from './email.service';
 import { ImapService } from './imap.service';
 import { CreateSmtpConfigDto } from './dto/create-smtp-config.dto';
@@ -10,7 +10,7 @@ import { SendEmailDto } from './dto/send-email.dto';
 import type { Response } from 'express';
 
 @Controller('email')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class EmailController {
   constructor(
     private readonly emailService: EmailService,
@@ -18,53 +18,60 @@ export class EmailController {
   ) {}
 
   @Get('config')
-  getConfig(@CurrentUser() user: any) {
-    return this.emailService.getSmtpConfig(user.tenantId);
+  async getConfig(@Req() req: any) {
+    const user = req.user;
+    const [smtp, imap] = await Promise.all([
+      this.emailService.getSmtpConfig(user.tenantId).catch(() => null),
+      this.imapService.getConfig(user.tenantId),
+    ]);
+    return { smtp, imap };
   }
 
   @Put('config')
-  upsertConfig(@Body() dto: CreateSmtpConfigDto, @CurrentUser() user: any) {
-    return this.emailService.upsertSmtpConfig(user.tenantId, dto);
+  @RequirePermission('manage_settings')
+  upsertConfig(@Body() dto: CreateSmtpConfigDto, @Req() req: any) {
+    return this.emailService.upsertSmtpConfig(req.user.tenantId, dto);
   }
 
   @Get('imap-config')
-  getImapConfig(@CurrentUser() user: any) {
-    return this.imapService.getConfig(user.tenantId);
+  getImapConfig(@Req() req: any) {
+    return this.imapService.getConfig(req.user.tenantId);
   }
 
   @Put('imap-config')
-  upsertImapConfig(@Body() dto: CreateImapConfigDto, @CurrentUser() user: any) {
-    return this.imapService.upsertConfig(user.tenantId, dto);
+  @RequirePermission('manage_settings')
+  upsertImapConfig(@Body() dto: CreateImapConfigDto, @Req() req: any) {
+    return this.imapService.upsertConfig(req.user.tenantId, dto);
   }
 
   @Post('imap-sync')
-  syncImap(@CurrentUser() user: any) {
-    return this.imapService.syncMailbox(user.tenantId);
+  syncImap(@Req() req: any) {
+    return this.imapService.syncMailbox(req.user.tenantId);
   }
 
   @Get('templates')
-  getTemplates(@CurrentUser() user: any) {
-    return this.emailService.getTemplates(user.tenantId);
+  getTemplates(@Req() req: any) {
+    return this.emailService.getTemplates(req.user.tenantId);
   }
 
   @Post('templates')
-  createTemplate(@Body() dto: CreateTemplateDto, @CurrentUser() user: any) {
-    return this.emailService.createTemplate(dto, user.tenantId);
+  createTemplate(@Body() dto: CreateTemplateDto, @Req() req: any) {
+    return this.emailService.createTemplate(dto, req.user.tenantId);
   }
 
   @Put('templates/:id')
-  updateTemplate(@Param('id') id: string, @Body() dto: CreateTemplateDto, @CurrentUser() user: any) {
-    return this.emailService.updateTemplate(id, dto, user.tenantId);
+  updateTemplate(@Param('id') id: string, @Body() dto: CreateTemplateDto, @Req() req: any) {
+    return this.emailService.updateTemplate(id, dto, req.user.tenantId);
   }
 
   @Post('send')
-  send(@Body() dto: SendEmailDto, @CurrentUser() user: any) {
-    return this.emailService.sendEmail(dto, user.tenantId);
+  send(@Body() dto: SendEmailDto, @Req() req: any) {
+    return this.emailService.sendEmail(dto, req.user.tenantId);
   }
 
   @Get('history')
-  getHistory(@Query('contactId') contactId: string, @CurrentUser() user: any) {
-    return this.emailService.getHistory(user.tenantId, contactId);
+  getHistory(@Query('leadId') leadId: string, @Req() req: any) {
+    return this.emailService.getHistory(req.user.tenantId, leadId);
   }
 }
 

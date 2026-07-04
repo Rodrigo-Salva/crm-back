@@ -12,21 +12,24 @@ export class DashboardService {
       ? { createdAt: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } }
       : {};
 
-    const [totalContacts, totalDeals, totalCompanies, totalActivities] = await Promise.all([
-      this.prisma.contact.count({ where: { tenantId, ...dateFilter } }),
-      this.prisma.deal.count({ where: { tenantId, ...dateFilter } }),
+    const [totalDeals, totalCompanies, totalActivities] = await Promise.all([
+      this.prisma.lead.count({ where: { tenantId, ...dateFilter } }),
       this.prisma.company.count({ where: { tenantId, ...dateFilter } }),
       this.prisma.activity.count({ where: { tenantId, ...dateFilter } }),
     ]);
 
-    const closedDeals = await this.prisma.deal.aggregate({
-      where: { tenantId, stage: 'closed_won', ...dateFilter },
+    const wonStages = await this.prisma.pipelineStage.findMany({
+      where: { tenantId, isWon: true },
+      select: { name: true },
+    });
+
+    const closedDeals = await this.prisma.lead.aggregate({
+      where: { tenantId, status: { in: wonStages.map((s) => s.name) }, ...dateFilter },
       _sum: { value: true },
       _count: true,
     });
 
     return {
-      totalContacts,
       totalDeals,
       totalCompanies,
       totalActivities,
@@ -43,7 +46,7 @@ export class DashboardService {
 
     const counts = await Promise.all(
       stages.map((stage) =>
-        this.prisma.deal.count({ where: { tenantId, stage: stage.name } }),
+        this.prisma.lead.count({ where: { tenantId, status: stage.name } }),
       ),
     );
 
@@ -101,8 +104,8 @@ export class DashboardService {
     const dealStageMap = new Map<string, { count: number; totalValue: number }>();
 
     for (const stage of stages) {
-      const agg = await this.prisma.deal.aggregate({
-        where: { tenantId, stage: stage.name },
+      const agg = await this.prisma.lead.aggregate({
+        where: { tenantId, status: stage.name },
         _count: true,
         _sum: { value: true },
       });
@@ -164,9 +167,9 @@ export class DashboardService {
       stageWeights[s.name] = Math.min((i + 1) / stages.length, 1);
     });
 
-    const deals = await this.prisma.deal.findMany({
+    const leads = await this.prisma.lead.findMany({
       where: { tenantId, expectedCloseDate: { gte: now, lte: end } },
-      select: { title: true, value: true, stage: true, expectedCloseDate: true, contact: { select: { name: true } } },
+      select: { name: true, value: true, status: true, expectedCloseDate: true },
     });
 
     const monthly: Record<string, { total: number; weighted: number; deals: any[] }> = {};
@@ -176,13 +179,13 @@ export class DashboardService {
       monthly[key] = { total: 0, weighted: 0, deals: [] };
     }
 
-    for (const deal of deals) {
-      if (!deal.expectedCloseDate) continue;
-      const key = `${deal.expectedCloseDate.getFullYear()}-${String(deal.expectedCloseDate.getMonth() + 1).padStart(2, '0')}`;
+    for (const lead of leads) {
+      if (!lead.expectedCloseDate) continue;
+      const key = `${lead.expectedCloseDate.getFullYear()}-${String(lead.expectedCloseDate.getMonth() + 1).padStart(2, '0')}`;
       if (!monthly[key]) continue;
-      monthly[key].total += deal.value;
-      monthly[key].weighted += deal.value * (stageWeights[deal.stage] || 0);
-      monthly[key].deals.push({ title: deal.title, value: deal.value, stage: deal.stage, contact: deal.contact?.name });
+      monthly[key].total += lead.value;
+      monthly[key].weighted += lead.value * (stageWeights[lead.status] || 0);
+      monthly[key].deals.push({ title: lead.name, value: lead.value, stage: lead.status });
     }
 
     return Object.entries(monthly).map(([month, data]) => ({
@@ -191,5 +194,32 @@ export class DashboardService {
       weighted: Math.round(data.weighted * 100) / 100,
       deals: data.deals.length,
     }));
+  }
+
+  private static readonly MONTHLY_FACTOR: Record<string, number> = {
+    weekly: 52 / 12,
+    monthly: 1,
+    quarterly: 1 / 3,
+    yearly: 1 / 12,
+  };
+
+  async getMrrArr(tenantId: string) {
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: { tenantId, status: 'active' },
+      select: { amount: true, currency: true, billingInterval: true },
+    });
+
+    const mrr: Record<string, number> = {};
+    for (const sub of subscriptions) {
+      const monthlyAmount = sub.amount * DashboardService.MONTHLY_FACTOR[sub.billingInterval];
+      mrr[sub.currency] = Math.round(((mrr[sub.currency] || 0) + monthlyAmount) * 100) / 100;
+    }
+
+    const arr: Record<string, number> = {};
+    for (const currency of Object.keys(mrr)) {
+      arr[currency] = Math.round(mrr[currency] * 12 * 100) / 100;
+    }
+
+    return { mrr, arr, activeSubscriptions: subscriptions.length };
   }
 }

@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { RolePermissionsModule } from '@crm/role-permissions';
 import { DashboardService } from './dashboard.service';
 import { ExportService } from './export.service';
 import { DashboardController } from './dashboard.controller';
 
 @Module({
+  imports: [RolePermissionsModule],
   controllers: [DashboardController],
   providers: [DashboardService, ExportService],
   exports: [DashboardService, ExportService],

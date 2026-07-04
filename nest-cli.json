@@ -5,6 +5,7 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": true,
+    "webpackConfigPath": "webpack.config.js",
     "tsConfigPath": "apps/api/tsconfig.app.json"
   },
   "generateOptions": {
@@ -86,24 +87,6 @@
         "tsConfigPath": "libs/companies/tsconfig.lib.json"
       }
     },
-    "contacts": {
-      "type": "library",
-      "root": "libs/contacts",
-      "entryFile": "index",
-      "sourceRoot": "libs/contacts/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/contacts/tsconfig.lib.json"
-      }
-    },
-    "deals": {
-      "type": "library",
-      "root": "libs/deals",
-      "entryFile": "index",
-      "sourceRoot": "libs/deals/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/deals/tsconfig.lib.json"
-      }
-    },
     "email": {
       "type": "library",
       "root": "libs/email",
@@ -183,6 +166,33 @@
       "sourceRoot": "libs/campaigns/src",
       "compilerOptions": {
         "tsConfigPath": "libs/campaigns/tsconfig.lib.json"
+      }
+    },
+    "marketing-campaigns": {
+      "type": "library",
+      "root": "libs/marketing-campaigns",
+      "entryFile": "index",
+      "sourceRoot": "libs/marketing-campaigns/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/marketing-campaigns/tsconfig.lib.json"
+      }
+    },
+    "sales-goals": {
+      "type": "library",
+      "root": "libs/sales-goals",
+      "entryFile": "index",
+      "sourceRoot": "libs/sales-goals/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/sales-goals/tsconfig.lib.json"
+      }
+    },
+    "lead-forms": {
+      "type": "library",
+      "root": "libs/lead-forms",
+      "entryFile": "index",
+      "sourceRoot": "libs/lead-forms/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/lead-forms/tsconfig.lib.json"
       }
     },
     "dashboard": {

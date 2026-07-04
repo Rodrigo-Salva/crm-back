@@ -12,15 +12,14 @@ export class ActivitiesService {
   ) {}
 
   async create(dto: CreateActivityDto, ownerId: string, tenantId: string) {
-    return this.prisma.activity.create({
+    const activity = await this.prisma.activity.create({
       data: {
         type: dto.type as any,
         subject: dto.subject,
         description: dto.description,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         done: dto.done,
-        contactId: dto.contactId,
-        dealId: dto.dealId,
+        leadId: dto.leadId,
         ownerId,
         tenantId,
       },
@@ -33,20 +32,24 @@ export class ActivitiesService {
       await this.googleCalendarService.syncActivity(activity.id);
     }
 
+    if (dto.reminderMinutesBefore != null && activity.dueDate) {
+      await this.prisma.reminder.create({
+        data: { activityId: activity.id, userId: ownerId, minutesBefore: dto.reminderMinutesBefore },
+      });
+    }
+
     return activity;
   }
 
   async findAll(filters: {
-    contactId?: string;
-    dealId?: string;
+    leadId?: string;
     ownerId?: string;
     from?: string;
     to?: string;
     tenantId: string;
   }) {
     const where: any = { tenantId: filters.tenantId };
-    if (filters.contactId) where.contactId = filters.contactId;
-    if (filters.dealId) where.dealId = filters.dealId;
+    if (filters.leadId) where.leadId = filters.leadId;
     if (filters.ownerId) where.ownerId = filters.ownerId;
     if (filters.from || filters.to) {
       where.dueDate = {};
@@ -58,7 +61,7 @@ export class ActivitiesService {
       where,
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        contact: { select: { id: true, name: true } },
+        lead: { select: { id: true, name: true } },
       },
       orderBy: { dueDate: 'asc' },
     });
@@ -68,20 +71,40 @@ export class ActivitiesService {
     const start = from ? new Date(from) : new Date();
     const end = to ? new Date(to) : new Date(start.getTime() + 30 * 24 * 3600000);
 
-    const activities = await this.prisma.activity.findMany({
-      where: {
-        tenantId,
-        ownerId: userId,
-        dueDate: { gte: start, lte: end },
-      },
-      include: {
-        contact: { select: { id: true, name: true } },
-        deal: { select: { id: true, title: true } },
-      },
-      orderBy: { dueDate: 'asc' },
-    });
+    const [activities, tasks] = await Promise.all([
+      this.prisma.activity.findMany({
+        where: {
+          tenantId,
+          ownerId: userId,
+          dueDate: { gte: start, lte: end },
+        },
+        include: {
+          lead: { select: { id: true, name: true } },
+        },
+        orderBy: { dueDate: 'asc' },
+      }),
+      this.prisma.task.findMany({
+        where: {
+          tenantId,
+          assigneeId: userId,
+          dueDate: { gte: start, lte: end },
+        },
+        orderBy: { dueDate: 'asc' },
+      }),
+    ]);
 
-    return activities;
+    const taskEvents = tasks.map((t) => ({
+      id: t.id,
+      type: 'task',
+      subject: t.title,
+      dueDate: t.dueDate,
+      done: t.status === 'completed',
+      isTask: true,
+    }));
+
+    return [...activities, ...taskEvents].sort(
+      (a, b) => new Date(a.dueDate as any).getTime() - new Date(b.dueDate as any).getTime(),
+    );
   }
 
   async findById(id: string, tenantId: string) {
@@ -89,24 +112,42 @@ export class ActivitiesService {
       where: { id, tenantId },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        contact: { select: { id: true, name: true } },
-        deal: { select: { id: true, title: true } },
+        lead: { select: { id: true, name: true } },
       },
     });
     if (!activity) throw new NotFoundException('Activity not found');
     return activity;
   }
 
-  async update(id: string, dto: UpdateActivityDto, tenantId: string) {
+  async update(id: string, dto: UpdateActivityDto, tenantId: string, userId: string) {
     await this.findById(id, tenantId);
-    const data: any = { ...dto };
+    const { reminderMinutesBefore, ...rest } = dto;
+    const data: any = { ...rest };
     if (dto.dueDate) data.dueDate = new Date(dto.dueDate);
     const updated = await this.prisma.activity.update({ where: { id }, data });
-    
+
     if (updated.type === 'meeting') {
       await this.googleCalendarService.syncActivity(updated.id);
     }
-    
+
+    if (reminderMinutesBefore !== undefined) {
+      if (reminderMinutesBefore === null) {
+        await this.prisma.reminder.deleteMany({ where: { activityId: id, userId } });
+      } else {
+        const existing = await this.prisma.reminder.findFirst({ where: { activityId: id, userId } });
+        if (existing) {
+          await this.prisma.reminder.update({
+            where: { id: existing.id },
+            data: { minutesBefore: reminderMinutesBefore, sent: false },
+          });
+        } else {
+          await this.prisma.reminder.create({
+            data: { activityId: id, userId, minutesBefore: reminderMinutesBefore },
+          });
+        }
+      }
+    }
+
     return updated;
   }
 

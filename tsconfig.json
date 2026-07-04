@@ -34,12 +34,6 @@
       "@crm/companies/*": [
         "libs/companies/src/*"
       ],
-      "@crm/contacts": [
-        "libs/contacts/src"
-      ],
-      "@crm/contacts/*": [
-        "libs/contacts/src/*"
-      ],
       "@crm/custom-fields": [
         "libs/custom-fields/src"
       ],
@@ -69,12 +63,6 @@
       ],
       "@crm/email/*": [
         "libs/email/src/*"
-      ],
-      "@crm/deals": [
-        "libs/deals/src"
-      ],
-      "@crm/deals/*": [
-        "libs/deals/src/*"
       ],
       "@crm/email": [
         "libs/email/src"
@@ -129,6 +117,24 @@
       ],
       "@crm/campaigns/*": [
         "libs/campaigns/src/*"
+      ],
+      "@crm/marketing-campaigns": [
+        "libs/marketing-campaigns/src"
+      ],
+      "@crm/marketing-campaigns/*": [
+        "libs/marketing-campaigns/src/*"
+      ],
+      "@crm/sales-goals": [
+        "libs/sales-goals/src"
+      ],
+      "@crm/sales-goals/*": [
+        "libs/sales-goals/src/*"
+      ],
+      "@crm/lead-forms": [
+        "libs/lead-forms/src"
+      ],
+      "@crm/lead-forms/*": [
+        "libs/lead-forms/src/*"
       ],
       "@crm/dashboard": [
         "libs/dashboard/src"
@@ -213,6 +219,36 @@
       ],
       "@crm/time-tracking/*": [
         "libs/time-tracking/src/*"
+      ],
+      "@crm/payments": [
+        "libs/payments/src"
+      ],
+      "@crm/payments/*": [
+        "libs/payments/src/*"
+      ],
+      "@crm/contracts": [
+        "libs/contracts/src"
+      ],
+      "@crm/contracts/*": [
+        "libs/contracts/src/*"
+      ],
+      "@crm/subscriptions": [
+        "libs/subscriptions/src"
+      ],
+      "@crm/subscriptions/*": [
+        "libs/subscriptions/src/*"
+      ],
+      "@crm/playbooks": [
+        "libs/playbooks/src"
+      ],
+      "@crm/playbooks/*": [
+        "libs/playbooks/src/*"
+      ],
+      "@crm/public-api": [
+        "libs/public-api/src"
+      ],
+      "@crm/public-api/*": [
+        "libs/public-api/src/*"
       ]
     }
   }

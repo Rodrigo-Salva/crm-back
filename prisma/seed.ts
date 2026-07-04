@@ -51,8 +51,8 @@ async function main() {
     { name: 'Contactado', order: 1 },
     { name: 'Reunión', order: 2 },
     { name: 'Negociación', order: 3 },
-    { name: 'Cerrado Ganado', order: 4 },
-    { name: 'Cerrado Perdido', order: 5 },
+    { name: 'Cerrado Ganado', order: 4, isWon: true },
+    { name: 'Cerrado Perdido', order: 5, isLost: true },
   ];
 
   for (const stage of stages) {
@@ -80,54 +80,55 @@ async function main() {
 
   console.log('Company created:', company.name);
 
-  const existingContact1 = await prisma.contact.findFirst({
+  const existingLead1 = await prisma.lead.findFirst({
     where: { email: 'juan@techsolutions.com', tenantId: tenant.id },
   });
 
-  const contact1 = existingContact1 || await prisma.contact.create({
+  const lead1 = existingLead1 || await prisma.lead.create({
     data: {
       name: 'Juan Pérez',
       email: 'juan@techsolutions.com',
       phone: '+51999000002',
+      status: 'Nuevo',
       tenantId: tenant.id,
       companyId: company.id,
       ownerId: admin.id,
     },
   });
 
-  const existingContact2 = await prisma.contact.findFirst({
+  const existingLead2 = await prisma.lead.findFirst({
     where: { email: 'maria@techsolutions.com', tenantId: tenant.id },
   });
 
-  const contact2 = existingContact2 || await prisma.contact.create({
+  const lead2 = existingLead2 || await prisma.lead.create({
     data: {
       name: 'María López',
       email: 'maria@techsolutions.com',
       phone: '+51999000003',
+      status: 'Nuevo',
       tenantId: tenant.id,
       companyId: company.id,
       ownerId: admin.id,
     },
   });
 
-  console.log('Contacts created');
+  console.log('Leads created');
 
-  const existingDeal = await prisma.deal.findFirst({
-    where: { title: 'Implementación CRM', tenantId: tenant.id },
+  const existingDeal = await prisma.lead.findFirst({
+    where: { name: 'Implementación CRM', tenantId: tenant.id },
   });
 
   if (!existingDeal) {
-    await prisma.deal.create({
+    await prisma.lead.create({
       data: {
-        title: 'Implementación CRM',
+        name: 'Implementación CRM',
         value: 50000,
-        stage: 'Nuevo',
-        contactId: contact1.id,
+        status: 'Nuevo',
         tenantId: tenant.id,
         ownerId: admin.id,
       },
     });
-    console.log('Deal created');
+    console.log('Lead created');
   }
 
   await prisma.product.upsert({

@@ -1,10 +1,11 @@
 import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard } from '@crm/role-permissions';
 import { AiAssistantService } from './ai-assistant.service';
 
 @Controller('ai')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class AiAssistantController {
   constructor(private readonly service: AiAssistantService) {}
 

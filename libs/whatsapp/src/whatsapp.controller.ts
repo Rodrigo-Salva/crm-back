@@ -1,15 +1,18 @@
 import { Controller, Get, Post, Put, Body, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard, RequirePermission } from '@crm/role-permissions';
 import { WhatsappService } from './whatsapp.service';
+import { UpsertWhatsappConfigDto, SendWhatsappDto } from './dto/whatsapp.dto';
 
 @Controller('whatsapp')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class WhatsappController {
   constructor(private readonly service: WhatsappService) {}
 
   @Put('config')
-  upsertConfig(@Body() dto: any, @CurrentUser() user: any) {
+  @RequirePermission('manage_settings')
+  upsertConfig(@Body() dto: UpsertWhatsappConfigDto, @CurrentUser() user: any) {
     return this.service.upsertConfig(dto, user.tenantId);
   }
 
@@ -19,7 +22,7 @@ export class WhatsappController {
   }
 
   @Post('send')
-  send(@Body() dto: { to: string; templateName: string; params?: Record<string, string> }, @CurrentUser() user: any) {
+  send(@Body() dto: SendWhatsappDto, @CurrentUser() user: any) {
     return this.service.sendTemplate(user.tenantId, dto.to, dto.templateName, dto.params);
   }
 }

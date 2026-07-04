@@ -9,13 +9,6 @@ import { CurrentUser } from '@crm/auth';
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
 
-  @Post('contacts')
-  @UseInterceptors(FileInterceptor('file'))
-  importContacts(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
-    if (!file) throw new BadRequestException('CSV file required');
-    return this.importService.importContacts(file.buffer, user.id, user.tenantId);
-  }
-
   @Post('companies')
   @UseInterceptors(FileInterceptor('file'))
   importCompanies(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
@@ -23,11 +16,11 @@ export class ImportController {
     return this.importService.importCompanies(file.buffer, user.id, user.tenantId);
   }
 
-  @Post('deals')
+  @Post('leads')
   @UseInterceptors(FileInterceptor('file'))
-  importDeals(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
+  importLeads(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
     if (!file) throw new BadRequestException('CSV file required');
-    return this.importService.importDeals(file.buffer, user.id, user.tenantId);
+    return this.importService.importLeads(file.buffer, user.id, user.tenantId);
   }
 
   @Post('products')

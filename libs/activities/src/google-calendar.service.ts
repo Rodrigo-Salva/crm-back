@@ -18,7 +18,7 @@ export class GoogleCalendarService {
   async syncActivity(activityId: string) {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
-      include: { owner: true, contact: true }
+      include: { owner: true, lead: true }
     });
 
     if (!activity || !activity.dueDate || !activity.owner.googleRefreshToken || activity.type !== 'meeting') {
@@ -43,7 +43,7 @@ export class GoogleCalendarService {
           dateTime: new Date(activity.dueDate.getTime() + 60 * 60 * 1000).toISOString(),
           timeZone: 'UTC',
         },
-        attendees: activity.contact ? [{ email: activity.contact.email }] : [],
+        attendees: activity.lead?.email ? [{ email: activity.lead.email }] : [],
       };
 
       if (activity.googleCalendarEventId) {

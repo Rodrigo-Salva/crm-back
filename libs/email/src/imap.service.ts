@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { ImapFlow } from 'imapflow';
+import { simpleParser } from 'mailparser';
 
 @Injectable()
 export class ImapService {
@@ -9,11 +10,15 @@ export class ImapService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async upsertConfig(tenantId: string, dto: { host: string; port?: number; username: string; password: string; useTLS?: boolean }) {
+  async upsertConfig(tenantId: string, dto: { host: string; port?: number; username: string; password?: string; useTLS?: boolean }) {
+    const existing = await this.prisma.imapConfig.findUnique({ where: { tenantId } });
+    const password = dto.password || existing?.password;
+    if (!password) throw new BadRequestException('Password is required');
+
     const config = await this.prisma.imapConfig.upsert({
       where: { tenantId },
-      create: { ...dto, tenantId },
-      update: dto,
+      create: { ...dto, password, tenantId },
+      update: { ...dto, password },
     });
     this.disconnect(tenantId);
     return config;
@@ -73,9 +78,10 @@ export class ImapService {
           const from = envelope.from?.[0]?.address || '';
           const to = envelope.to?.[0]?.address || '';
           const subject = envelope.subject || '';
-          const textBody = msg.source?.toString() || '';
+          const parsed = msg.source ? await simpleParser(msg.source) : null;
+          const textBody = parsed?.text || parsed?.html || '';
 
-          const contact = await this.prisma.contact.findFirst({
+          const lead = await this.prisma.lead.findFirst({
             where: { tenantId, email: { equals: from, mode: 'insensitive' } },
           });
 
@@ -86,20 +92,20 @@ export class ImapService {
               body: textBody.substring(0, 10000),
               fromEmail: from,
               toEmail: to,
-              contactId: contact?.id,
+              leadId: lead?.id,
               tenantId,
               messageId: envelope.messageId,
             },
           });
 
-          if (contact) {
+          if (lead) {
             await this.prisma.activity.create({
               data: {
                 type: 'email',
                 subject: `Email from ${from}: ${subject}`,
                 description: textBody.substring(0, 500),
-                contactId: contact.id,
-                ownerId: contact.ownerId,
+                leadId: lead.id,
+                ownerId: lead.ownerId,
                 tenantId,
               },
             });

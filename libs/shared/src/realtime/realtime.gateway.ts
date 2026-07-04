@@ -29,7 +29,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { event: 'joined', data: tenantId };
   }
 
+  @SubscribeMessage('joinUser')
+  handleJoinUser(@MessageBody('userId') userId: string, @ConnectedSocket() client: Socket) {
+    client.join(`user_${userId}`);
+    this.logger.log(`Client ${client.id} joined user_${userId}`);
+    return { event: 'joined', data: userId };
+  }
+
   broadcastToTenant(tenantId: string, event: string, payload: any) {
     this.server.to(`tenant_${tenantId}`).emit(event, payload);
+  }
+
+  notifyUser(userId: string, event: string, payload: any) {
+    this.server.to(`user_${userId}`).emit(event, payload);
   }
 }

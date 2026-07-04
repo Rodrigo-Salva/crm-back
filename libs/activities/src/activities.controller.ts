@@ -4,9 +4,10 @@ import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard } from '@crm/role-permissions';
 
 @Controller('activities')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class ActivitiesController {
   constructor(private readonly service: ActivitiesService) {}
 
@@ -17,14 +18,13 @@ export class ActivitiesController {
 
   @Get()
   findAll(
-    @Query('contactId') contactId: string,
-    @Query('dealId') dealId: string,
+    @Query('leadId') leadId: string,
     @Query('ownerId') ownerId: string,
     @Query('from') from: string,
     @Query('to') to: string,
     @CurrentUser() user: any,
   ) {
-    return this.service.findAll({ contactId, dealId, ownerId, from, to, tenantId: user.tenantId });
+    return this.service.findAll({ leadId, ownerId, from, to, tenantId: user.tenantId });
   }
 
   @Get('calendar')
@@ -43,7 +43,7 @@ export class ActivitiesController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateActivityDto, @CurrentUser() user: any) {
-    return this.service.update(id, dto, user.tenantId);
+    return this.service.update(id, dto, user.tenantId, user.id);
   }
 
   @Delete(':id')

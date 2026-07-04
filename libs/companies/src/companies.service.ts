@@ -44,7 +44,7 @@ export class CompaniesService {
     const [data, total] = await Promise.all([
       this.prisma.company.findMany({
         where,
-        include: { owner: { select: { id: true, name: true, email: true } }, _count: { select: { contacts: true } } },
+        include: { owner: { select: { id: true, name: true, email: true } }, _count: { select: { leads: true } } },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -60,7 +60,7 @@ export class CompaniesService {
       where: { id, tenantId },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        contacts: { select: { id: true, name: true, email: true, status: true } },
+        leads: { select: { id: true, name: true, email: true, status: true } },
       },
     });
     if (!company) throw new NotFoundException('Company not found');

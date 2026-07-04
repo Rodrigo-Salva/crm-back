@@ -9,9 +9,10 @@ export class ProductsService {
     return this.prisma.product.create({ data: { ...dto, tenantId } });
   }
 
-  async findAll(tenantId: string, category?: string) {
+  async findAll(tenantId: string, category?: string, search?: string) {
     const where: any = { tenantId };
     if (category) where.category = category;
+    if (search) where.name = { contains: search, mode: 'insensitive' };
     return this.prisma.product.findMany({ where, orderBy: { name: 'asc' } });
   }
 

@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsDateString } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsBoolean, IsDateString, IsInt, Min } from 'class-validator';
 
 export enum ActivityType {
   CALL = 'call',
@@ -29,9 +29,10 @@ export class CreateActivityDto {
 
   @IsString()
   @IsOptional()
-  contactId?: string;
+  leadId?: string;
 
-  @IsString()
+  @IsInt()
+  @Min(1)
   @IsOptional()
-  dealId?: string;
+  reminderMinutesBefore?: number;
 }

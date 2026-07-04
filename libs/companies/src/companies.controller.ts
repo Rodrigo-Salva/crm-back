@@ -5,9 +5,10 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { QueryCompanyDto } from './dto/query-company.dto';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard } from '@crm/role-permissions';
 
 @Controller('companies')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 

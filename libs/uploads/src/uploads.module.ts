@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
+import { RolePermissionsModule } from '@crm/role-permissions';
 import { UploadsService } from './uploads.service';
 import { UploadsController } from './uploads.controller';
 
 @Module({
-  imports: [MulterModule.register({ dest: './uploads' })],
+  imports: [MulterModule.register({ dest: './uploads' }), RolePermissionsModule],
   controllers: [UploadsController],
   providers: [UploadsService],
   exports: [UploadsService],

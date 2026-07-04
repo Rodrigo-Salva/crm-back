@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsEmail, Min, Max } from 'class-validator';
+import { IsString, IsInt, IsEmail, IsOptional, Min, Max } from 'class-validator';
 
 export class CreateSmtpConfigDto {
   @IsString()
@@ -13,7 +13,8 @@ export class CreateSmtpConfigDto {
   username: string;
 
   @IsString()
-  password: string;
+  @IsOptional()
+  password?: string;
 
   @IsEmail()
   fromEmail: string;

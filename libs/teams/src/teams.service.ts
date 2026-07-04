@@ -24,7 +24,7 @@ export class TeamsService {
       where: { tenantId },
       include: {
         members: { include: { user: { select: { id: true, name: true, email: true } } } },
-        _count: { select: { contacts: true, deals: true, tickets: true, tasks: true, leads: true } },
+        _count: { select: { tickets: true, tasks: true, leads: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -35,7 +35,7 @@ export class TeamsService {
       where: { id, tenantId },
       include: {
         members: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } },
-        _count: { select: { contacts: true, deals: true, tickets: true, tasks: true, leads: true } },
+        _count: { select: { tickets: true, tasks: true, leads: true } },
       },
     });
     if (!team) throw new NotFoundException('Team not found');

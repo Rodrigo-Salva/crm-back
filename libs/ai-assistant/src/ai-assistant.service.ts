@@ -6,25 +6,24 @@ export class AiAssistantService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSuggestions(entity: string, entityId: string, tenantId: string) {
-    if (entity === 'deal') {
-      return this.getDealSuggestions(entityId, tenantId);
+    if (entity === 'lead' || entity === 'deal') {
+      return this.getLeadSuggestions(entityId, tenantId);
     }
     return [];
   }
 
-  private async getDealSuggestions(dealId: string, tenantId: string) {
-    const deal = await this.prisma.deal.findFirst({
-      where: { id: dealId, tenantId },
-      include: { contact: { select: { name: true, email: true } } },
+  private async getLeadSuggestions(leadId: string, tenantId: string) {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, tenantId },
     });
-    if (!deal) return [];
+    if (!lead) return [];
 
     const stages = await this.prisma.pipelineStage.findMany({
       where: { tenantId },
       orderBy: { order: 'asc' },
     });
 
-    const currentIdx = stages.findIndex((s) => s.name === deal.stage);
+    const currentIdx = stages.findIndex((s) => s.name === lead.status);
     const nextStage = stages[currentIdx + 1];
 
     const suggestions: { action: string; reason: string; category: string }[] = [];
@@ -32,13 +31,13 @@ export class AiAssistantService {
     if (nextStage) {
       suggestions.push({
         action: `Mover a etapa "${nextStage.name}"`,
-        reason: `La oportunidad "${deal.title}" está lista para avanzar en el pipeline`,
+        reason: `La oportunidad "${lead.name}" está lista para avanzar en el pipeline`,
         category: 'pipeline',
       });
     }
 
     const lastActivity = await this.prisma.activity.findFirst({
-      where: { dealId, tenantId },
+      where: { leadId, tenantId },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -50,9 +49,9 @@ export class AiAssistantService {
       });
     }
 
-    if (deal.contact?.email) {
+    if (lead.email) {
       suggestions.push({
-        action: `Enviar correo a ${deal.contact.name}`,
+        action: `Enviar correo a ${lead.name}`,
         reason: 'Mantener contacto con el cliente para avanzar la negociación',
         category: 'communication',
       });

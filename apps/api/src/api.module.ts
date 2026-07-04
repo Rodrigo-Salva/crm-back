@@ -6,11 +6,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { SharedModule } from '@crm/shared';
-import { AuthModule } from '@crm/auth';
+import { AuthModule, TwoFactorSetupGuard } from '@crm/auth';
 import { TenantModule } from '@crm/tenant';
-import { ContactsModule } from '@crm/contacts';
 import { CompaniesModule } from '@crm/companies';
-import { DealsModule } from '@crm/deals';
 import { CustomFieldsModule } from '@crm/custom-fields';
 import { PipelineStagesModule } from '@crm/pipeline-stages';
 import { ActivitiesModule } from '@crm/activities';
@@ -19,6 +17,9 @@ import { EmailModule } from '@crm/email';
 import { AutomationModule } from '@crm/automation';
 import { AuditModule } from '@crm/audit';
 import { CampaignsModule } from '@crm/campaigns';
+import { MarketingCampaignsModule } from '@crm/marketing-campaigns';
+import { SalesGoalsModule } from '@crm/sales-goals';
+import { LeadFormsModule } from '@crm/lead-forms';
 import { DashboardModule } from '@crm/dashboard';
 import { ProductsModule } from '@crm/products';
 import { QuotesModule } from '@crm/quotes';
@@ -33,11 +34,21 @@ import { LeadsModule } from '@crm/leads';
 import { UploadsModule } from '@crm/uploads';
 import { TeamsModule } from '@crm/teams';
 import { TimeTrackingModule } from '@crm/time-tracking';
+import { TasksModule } from '@crm/tasks';
+import { UsersModule } from '@crm/users';
+import { NotesModule } from '@crm/notes';
 import { AdminModule } from './admin/admin.module';
 import { ImportModule } from './import/import.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { ApiController } from './api.controller';
 import { ApiService } from './api.service';
+import { CareersModule } from './careers/careers.module';
+import { ModalitiesModule } from './modalities/modalities.module';
+import { PaymentsModule } from '@crm/payments';
+import { ContractsModule } from '@crm/contracts';
+import { SubscriptionsModule } from '@crm/subscriptions';
+import { PlaybooksModule } from '@crm/playbooks';
+import { PublicApiModule } from '@crm/public-api';
 
 @Module({
   imports: [
@@ -66,9 +77,7 @@ import { ApiService } from './api.service';
     SharedModule,
     AuthModule,
     TenantModule,
-    ContactsModule,
     CompaniesModule,
-    DealsModule,
     CustomFieldsModule,
     PipelineStagesModule,
     ActivitiesModule,
@@ -77,6 +86,9 @@ import { ApiService } from './api.service';
     AutomationModule,
     AuditModule,
     CampaignsModule,
+    MarketingCampaignsModule,
+    SalesGoalsModule,
+    LeadFormsModule,
     DashboardModule,
     ProductsModule,
     QuotesModule,
@@ -91,9 +103,19 @@ import { ApiService } from './api.service';
     UploadsModule,
     TeamsModule,
     TimeTrackingModule,
+    TasksModule,
+    UsersModule,
+    NotesModule,
     AdminModule,
     ImportModule,
     SchedulerModule,
+    CareersModule,
+    ModalitiesModule,
+    PaymentsModule,
+    SubscriptionsModule,
+    ContractsModule,
+    PlaybooksModule,
+    PublicApiModule,
   ],
   controllers: [ApiController],
   providers: [
@@ -101,6 +123,10 @@ import { ApiService } from './api.service';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TwoFactorSetupGuard,
     },
   ],
 })

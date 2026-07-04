@@ -21,10 +21,14 @@ export class EmailService {
   }
 
   async upsertSmtpConfig(tenantId: string, dto: CreateSmtpConfigDto) {
+    const existing = await this.prisma.smtpConfig.findUnique({ where: { tenantId } });
+    const password = dto.password || existing?.password;
+    if (!password) throw new BadRequestException('Password is required');
+
     return this.prisma.smtpConfig.upsert({
       where: { tenantId },
-      create: { ...dto, tenantId },
-      update: dto,
+      create: { ...dto, password, tenantId },
+      update: { ...dto, password },
     });
   }
 
@@ -89,7 +93,7 @@ export class EmailService {
         html: body,
       });
 
-      const contact = await this.prisma.contact.findFirst({
+      const lead = await this.prisma.lead.findFirst({
         where: { tenantId, email: { equals: dto.to, mode: 'insensitive' } },
       });
 
@@ -100,7 +104,7 @@ export class EmailService {
           body: body.substring(0, 5000),
           fromEmail: config.fromEmail,
           toEmail: dto.to,
-          contactId: contact?.id,
+          leadId: lead?.id,
           tenantId,
           trackingId,
           messageId: info.messageId,
@@ -120,12 +124,12 @@ export class EmailService {
     });
   }
 
-  async getHistory(tenantId: string, contactId?: string) {
+  async getHistory(tenantId: string, leadId?: string) {
     const where: any = { tenantId };
-    if (contactId) where.contactId = contactId;
+    if (leadId) where.leadId = leadId;
     return this.prisma.email.findMany({
       where,
-      include: { contact: { select: { id: true, name: true, email: true } } },
+      include: { lead: { select: { id: true, name: true, email: true } } },
       orderBy: { sentAt: 'desc' },
       take: 100,
     });

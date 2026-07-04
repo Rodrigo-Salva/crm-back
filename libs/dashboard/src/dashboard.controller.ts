@@ -1,12 +1,13 @@
 import { Controller, Get, Query, Param, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard } from '@crm/role-permissions';
 import { DashboardService } from './dashboard.service';
 import { ExportService } from './export.service';
 import type { Response } from 'express';
 
 @Controller('dashboard')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class DashboardController {
   constructor(
     private readonly service: DashboardService,
@@ -55,6 +56,11 @@ export class DashboardController {
     @CurrentUser() user: any,
   ) {
     return this.service.getForecast(user.tenantId, Number(months) || 3);
+  }
+
+  @Get('mrr')
+  getMrrArr(@CurrentUser() user: any) {
+    return this.service.getMrrArr(user.tenantId);
   }
 
   @Get('export/:type')

@@ -3,9 +3,10 @@ import { CompaniesService } from './companies.service';
 import { CompaniesController } from './companies.controller';
 import { AutomationModule } from '@crm/automation';
 import { AuditModule } from '@crm/audit';
+import { RolePermissionsModule } from '@crm/role-permissions';
 
 @Module({
-  imports: [AutomationModule, AuditModule],
+  imports: [AutomationModule, AuditModule, RolePermissionsModule],
   controllers: [CompaniesController],
   providers: [CompaniesService],
   exports: [CompaniesService],

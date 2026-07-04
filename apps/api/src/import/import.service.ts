@@ -7,37 +7,6 @@ const csv = require('csv-parser');
 export class ImportService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async importContacts(buffer: Buffer, ownerId: string, tenantId: string) {
-    const results: any[] = [];
-    const errors: { row: number; message: string }[] = [];
-    let rowIndex = 0;
-
-    const stream = Readable.from(buffer.toString());
-    const parser = stream.pipe(csv());
-
-    for await (const row of parser) {
-      rowIndex++;
-      try {
-        const contact = await this.prisma.contact.create({
-          data: {
-            name: row.name || row.Name || row.nombre || row.Nombre || '',
-            email: row.email || row.Email || row.email || '',
-            phone: row.phone || row.Phone || row.telefono || '',
-            companyName: row.company || row.Company || row.empresa || '',
-            position: row.position || row.Position || row.cargo || '',
-            ownerId,
-            tenantId,
-          },
-        });
-        results.push(contact);
-      } catch (err: any) {
-        errors.push({ row: rowIndex, message: err.message });
-      }
-    }
-
-    return { imported: results.length, errors, total: rowIndex };
-  }
-
   async importCompanies(buffer: Buffer, ownerId: string, tenantId: string) {
     const results: any[] = [];
     const errors: { row: number; message: string }[] = [];
@@ -69,7 +38,7 @@ export class ImportService {
     return { imported: results.length, errors, total: rowIndex };
   }
 
-  async importDeals(buffer: Buffer, ownerId: string, tenantId: string) {
+  async importLeads(buffer: Buffer, ownerId: string, tenantId: string) {
     const results: any[] = [];
     const errors: { row: number; message: string }[] = [];
     let rowIndex = 0;
@@ -80,17 +49,20 @@ export class ImportService {
     for await (const row of parser) {
       rowIndex++;
       try {
-        const deal = await this.prisma.deal.create({
+        const lead = await this.prisma.lead.create({
           data: {
-            title: row.title || row.Title || row.name || row.Name || '',
+            name: row.title || row.Title || row.name || row.Name || row.nombre || row.Nombre || '',
+            email: row.email || row.Email || undefined,
+            phone: row.phone || row.Phone || row.telefono || undefined,
+            companyName: row.company || row.Company || row.empresa || undefined,
+            position: row.position || row.Position || row.cargo || undefined,
             value: parseFloat(row.value || row.Value || '0') || 0,
-            stage: row.stage || row.Stage || 'lead',
-            contactId: row.contactId || row.contact_id || '',
+            status: row.stage || row.Stage || row.status || row.Status || 'new',
             ownerId,
             tenantId,
           },
         });
-        results.push(deal);
+        results.push(lead);
       } catch (err: any) {
         errors.push({ row: rowIndex, message: err.message });
       }

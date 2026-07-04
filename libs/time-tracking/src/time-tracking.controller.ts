@@ -1,15 +1,17 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '@crm/auth';
+import { PermissionsGuard } from '@crm/role-permissions';
 import { TimeTrackingService } from './time-tracking.service';
+import { CreateTimeEntryDto } from './dto/create-time-entry.dto';
 
 @Controller('time-entries')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class TimeTrackingController {
   constructor(private readonly service: TimeTrackingService) {}
 
   @Post()
-  create(@Body() dto: { taskId: string; description?: string; duration: number; date?: string }, @CurrentUser() user: any) {
+  create(@Body() dto: CreateTimeEntryDto, @CurrentUser() user: any) {
     return this.service.create(dto, user.id, user.tenantId);
   }
 

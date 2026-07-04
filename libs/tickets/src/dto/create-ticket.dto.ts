@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
 
 export class CreateTicketDto {
   @IsString()
@@ -14,11 +15,17 @@ export class CreateTicketDto {
 
   @IsString()
   @IsOptional()
-  contactId?: string;
+  leadId?: string;
 
   @IsString()
   @IsOptional()
   assignedTo?: string;
+}
+
+export class UpdateTicketDto extends PartialType(CreateTicketDto) {
+  @IsString()
+  @IsOptional()
+  status?: string;
 }
 
 export class AddMessageDto {

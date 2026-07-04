@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean, IsArray } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -66,6 +66,8 @@ export class CreatePriceListDto {
   @IsString()
   name: string;
 
+  @IsArray()
+  @IsOptional()
   items?: { productId: string; customPrice?: number }[];
 }
 
