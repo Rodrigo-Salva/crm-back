@@ -15,6 +15,10 @@ export class ApiKeysService {
     return this.prisma.apiKey.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
   }
 
+  async update(id: string, dto: { active?: boolean }, tenantId: string) {
+    return this.prisma.apiKey.updateMany({ where: { id, tenantId }, data: dto });
+  }
+
   async remove(id: string, tenantId: string) {
     const key = await this.prisma.apiKey.findFirst({ where: { id, tenantId } });
     if (!key) throw new NotFoundException('API key not found');
