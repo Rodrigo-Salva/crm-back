@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
   BadRequestException,
@@ -9,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '@crm/shared';
 import { TenantService } from '@crm/tenant';
+import { EmailService } from '@crm/email';
 import { TwoFactorService } from './two-factor.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -18,12 +20,36 @@ import { v4 as uuid } from 'uuid';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly tenantService: TenantService,
     private readonly twoFactorService: TwoFactorService,
+    private readonly emailService: EmailService,
   ) {}
+
+  private async buildToken(user: { id: string; email: string; role: string; tenantId: string; isTwoFactorEnabled: boolean }) {
+    let mustSetupTwoFactor = false;
+    if (!user.isTwoFactorEnabled) {
+      const setting = await this.prisma.tenantSetting.findUnique({
+        where: { key_tenantId: { key: 'twoFactorRequiredRoles', tenantId: user.tenantId } },
+      });
+      const requiredRoles = setting?.value.split(',').map((r) => r.trim()).filter(Boolean) ?? [];
+      mustSetupTwoFactor = requiredRoles.includes(user.role);
+    }
+
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      ...(mustSetupTwoFactor ? { mustSetupTwoFactor: true } : {}),
+    });
+
+    return { token, mustSetupTwoFactor };
+  }
 
   async register(dto: RegisterDto, tenantSlug?: string) {
     const existingUser = await this.prisma.user.findFirst({
@@ -60,17 +86,12 @@ export class AuthService {
         role: 'seller',
         tenantId,
       },
-      select: { id: true, email: true, name: true, role: true, tenantId: true },
+      select: { id: true, email: true, name: true, role: true, tenantId: true, isTwoFactorEnabled: true },
     });
 
-    const token = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-    });
+    const { token, mustSetupTwoFactor } = await this.buildToken(user);
 
-    return { user, token };
+    return { user, token, mustSetupTwoFactor };
   }
 
   async login(dto: LoginDto) {
@@ -86,35 +107,25 @@ export class AuthService {
       return { requires2FA: true, userId: user.id };
     }
 
-    const token = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-    });
+    const { token, mustSetupTwoFactor } = await this.buildToken(user);
 
     const { password, twoFactorSecret, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, token };
+    return { user: userWithoutPassword, token, mustSetupTwoFactor };
   }
 
   async verify2FA(userId: string, code: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('User not found');
 
-    const isCodeValid = this.twoFactorService.isTwoFactorAuthenticationCodeValid(code, user);
+    const isCodeValid = await this.twoFactorService.isTwoFactorAuthenticationCodeValid(code, user);
     if (!isCodeValid) {
       throw new UnauthorizedException('Wrong authentication code');
     }
 
-    const token = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-    });
+    const { token, mustSetupTwoFactor } = await this.buildToken(user);
 
     const { password, twoFactorSecret, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, token };
+    return { user: userWithoutPassword, token, mustSetupTwoFactor };
   }
 
   async loginWithGoogle(reqUser: any) {
@@ -144,15 +155,10 @@ export class AuthService {
       return { requires2FA: true, userId: user.id };
     }
 
-    const token = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId,
-    });
+    const { token, mustSetupTwoFactor } = await this.buildToken(user);
 
     const { password, twoFactorSecret, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, token };
+    return { user: userWithoutPassword, token, mustSetupTwoFactor };
   }
 
   async generate2faQr(userId: string) {
@@ -171,7 +177,9 @@ export class AuthService {
 
   async enable2fa(userId: string, code: string) {
     await this.twoFactorService.turnOnTwoFactorAuthentication(userId, code);
-    return { success: true };
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const { token } = await this.buildToken(user);
+    return { success: true, token };
   }
 
   async me(userId: string) {
@@ -181,6 +189,32 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('User not found');
     return user;
+  }
+
+  async updateMe(userId: string, dto: { name?: string; avatar?: string }) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { name: dto.name, avatar: dto.avatar },
+      select: { id: true, email: true, name: true, avatar: true, role: true, tenantId: true, createdAt: true },
+    });
+  }
+
+  async changePassword(userId: string, dto: { currentPassword: string; newPassword: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const isValid = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isValid) throw new UnauthorizedException('Current password is incorrect');
+
+    if (dto.newPassword.length < 8) throw new BadRequestException('Password must be at least 8 characters');
+    if (!/[A-Z]/.test(dto.newPassword)) throw new BadRequestException('Password must contain an uppercase letter');
+    if (!/[a-z]/.test(dto.newPassword)) throw new BadRequestException('Password must contain a lowercase letter');
+    if (!/[0-9]/.test(dto.newPassword)) throw new BadRequestException('Password must contain a number');
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: hashedPassword } });
+
+    return { message: 'Password updated successfully' };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
@@ -196,7 +230,12 @@ export class AuthService {
       data: { email: dto.email, token, expiresAt },
     });
 
-    // TODO: Send email with reset link
+    try {
+      await this.emailService.sendPasswordResetEmail(dto.email, token, user.tenantId);
+    } catch (err: any) {
+      this.logger.warn(`Failed to send password reset email to ${dto.email}: ${err.message}`);
+    }
+
     return { message: 'If the email exists, a reset link has been sent' };
   }
 
@@ -224,43 +263,43 @@ export class AuthService {
   }
 
   async portalLogin(dto: LoginDto) {
-    const contact = await this.prisma.contact.findFirst({
+    const lead = await this.prisma.lead.findFirst({
       where: { email: dto.email, portalPassword: { not: null } },
     });
-    if (!contact || !contact.portalPassword) throw new UnauthorizedException('Invalid credentials');
+    if (!lead || !lead.portalPassword) throw new UnauthorizedException('Invalid credentials');
 
-    const isValid = await bcrypt.compare(dto.password, contact.portalPassword);
+    const isValid = await bcrypt.compare(dto.password, lead.portalPassword);
     if (!isValid) throw new UnauthorizedException('Invalid credentials');
 
     const token = this.jwtService.sign({
-      sub: contact.id,
-      email: contact.email,
+      sub: lead.id,
+      email: lead.email,
       role: 'portal',
-      tenantId: contact.tenantId,
+      tenantId: lead.tenantId,
       isPortal: true,
     });
 
-    return { contact: { id: contact.id, name: contact.name, email: contact.email }, token };
+    return { contact: { id: lead.id, name: lead.name, email: lead.email }, token };
   }
 
-  async togglePortalAccess(contactId: string, dto: { password?: string; enable: boolean }, tenantId: string) {
-    const contact = await this.prisma.contact.findFirst({
-      where: { id: contactId, tenantId },
+  async togglePortalAccess(leadId: string, dto: { password?: string; enable: boolean }, tenantId: string) {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, tenantId },
     });
-    if (!contact) throw new NotFoundException('Contact not found');
+    if (!lead) throw new NotFoundException('Lead not found');
 
     if (dto.enable && dto.password) {
       const hashedPassword = await bcrypt.hash(dto.password, 10);
-      await this.prisma.contact.update({
-        where: { id: contactId },
+      await this.prisma.lead.update({
+        where: { id: leadId },
         data: { portalPassword: hashedPassword },
       });
       return { message: 'Portal access enabled' };
     }
 
     if (!dto.enable) {
-      await this.prisma.contact.update({
-        where: { id: contactId },
+      await this.prisma.lead.update({
+        where: { id: leadId },
         data: { portalPassword: null },
       });
       return { message: 'Portal access disabled' };
@@ -272,17 +311,17 @@ export class AuthService {
   async changePortalPassword(user: any, dto: { currentPassword: string; newPassword: string }) {
     if (!user.isPortal) throw new UnauthorizedException('Not a portal user');
 
-    const contact = await this.prisma.contact.findUnique({
+    const lead = await this.prisma.lead.findUnique({
       where: { id: user.id },
       select: { portalPassword: true },
     });
-    if (!contact?.portalPassword) throw new BadRequestException('Portal access not configured');
+    if (!lead?.portalPassword) throw new BadRequestException('Portal access not configured');
 
-    const isValid = await bcrypt.compare(dto.currentPassword, contact.portalPassword);
+    const isValid = await bcrypt.compare(dto.currentPassword, lead.portalPassword);
     if (!isValid) throw new UnauthorizedException('Current password is incorrect');
 
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.contact.update({
+    await this.prisma.lead.update({
       where: { id: user.id },
       data: { portalPassword: hashedPassword },
     });

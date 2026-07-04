@@ -9,6 +9,7 @@ interface JwtPayload {
   role: string;
   tenantId: string;
   isPortal?: boolean;
+  mustSetupTwoFactor?: boolean;
 }
 
 @Injectable()
@@ -26,18 +27,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: JwtPayload) {
     if (payload.isPortal) {
-      const contact = await this.prisma.contact.findUnique({
+      const lead = await this.prisma.lead.findUnique({
         where: { id: payload.sub },
         select: { id: true, name: true, email: true, tenantId: true },
       });
-      if (!contact) throw new UnauthorizedException('Contact not found');
-      return { ...contact, role: 'portal', isPortal: true };
+      if (!lead) throw new UnauthorizedException('Lead not found');
+      return { ...lead, role: 'portal', isPortal: true };
     }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, email: true, name: true, role: true, tenantId: true },
     });
     if (!user) throw new UnauthorizedException('User not found');
-    return user;
+    return { ...user, mustSetupTwoFactor: payload.mustSetupTwoFactor ?? false };
   }
 }

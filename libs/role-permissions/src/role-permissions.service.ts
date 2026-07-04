@@ -1,10 +1,38 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { UserRole } from '@prisma/client';
 
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: ['create', 'read', 'update', 'delete', 'export', 'manage_users', 'manage_settings'],
+  seller: ['create', 'read', 'update', 'export'],
+  reader: ['read'],
+};
+
 @Injectable()
-export class RolePermissionsService {
+export class RolePermissionsService implements OnModuleInit {
+  private readonly logger = new Logger(RolePermissionsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  async onModuleInit() {
+    const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
+    for (const tenant of tenants) {
+      await this.seedDefaultsForTenant(tenant.id);
+    }
+    if (tenants.length > 0) {
+      this.logger.log(`Checked default role permissions for ${tenants.length} tenant(s)`);
+    }
+  }
+
+  async seedDefaultsForTenant(tenantId: string) {
+    const existing = await this.prisma.rolePermission.count({ where: { tenantId } });
+    if (existing > 0) return;
+
+    const rows = Object.entries(DEFAULT_ROLE_PERMISSIONS).flatMap(([role, permissions]) =>
+      permissions.map((permission) => ({ role: role as UserRole, permission, tenantId })),
+    );
+    await this.prisma.rolePermission.createMany({ data: rows, skipDuplicates: true });
+  }
 
   async findAll(tenantId: string) {
     return this.prisma.rolePermission.findMany({

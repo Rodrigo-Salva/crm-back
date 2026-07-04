@@ -1,28 +1,31 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolePermissionsService } from './role-permissions.service';
-import { CurrentUser } from '@crm/auth';
+import { SetPermissionDto } from './dto/set-permission.dto';
+import { PermissionsGuard } from './permissions.guard';
+import { RequirePermission } from './decorators/require-permission.decorator';
 
 @Controller('role-permissions')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
 export class RolePermissionsController {
   constructor(private readonly service: RolePermissionsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: any) {
-    return this.service.findAll(user.tenantId);
+  findAll(@Req() req: any) {
+    return this.service.findAll(req.user.tenantId);
   }
 
   @Get(':role')
-  findByRole(@Param('role') role: string, @CurrentUser() user: any) {
-    return this.service.findByRole(role as any, user.tenantId);
+  findByRole(@Param('role') role: string, @Req() req: any) {
+    return this.service.findByRole(role as any, req.user.tenantId);
   }
 
   @Post()
+  @RequirePermission('manage_settings')
   setPermission(
-    @Body() body: { role: string; permission: string; enabled: boolean },
-    @CurrentUser() user: any,
+    @Body() body: SetPermissionDto,
+    @Req() req: any,
   ) {
-    return this.service.setPermission(body.role as any, body.permission, body.enabled, user.tenantId);
+    return this.service.setPermission(body.role as any, body.permission, body.enabled, req.user.tenantId);
   }
 }

@@ -7,6 +7,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { GoogleStrategy } from './google.strategy';
 import { TwoFactorService } from './two-factor.service';
 import { TenantModule } from '@crm/tenant';
+import { EmailModule } from '@crm/email';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TenantModule } from '@crm/tenant';
       signOptions: { expiresIn: '7d' as const },
     }),
     TenantModule,
+    EmailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, GoogleStrategy, TwoFactorService],
