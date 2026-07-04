@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { Currency } from '@prisma/client';
+import { WebhooksService } from '@crm/webhooks';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import Stripe from 'stripe';
 const PDFDocument = require('pdfkit');
@@ -9,9 +10,12 @@ const PDFDocument = require('pdfkit');
 export class QuotesService {
   private readonly logger = new Logger(QuotesService.name);
   private readonly appUrl: string;
-  private stripe: Stripe;
+  private stripe: InstanceType<typeof Stripe>;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webhooksService: WebhooksService,
+  ) {
     this.appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
       apiVersion: '2025-01-27.acacia' as any,
@@ -60,8 +64,7 @@ export class QuotesService {
     return this.prisma.quote.create({
       data: {
         number,
-        dealId: dto.dealId,
-        contactId: dto.contactId,
+        leadId: dto.leadId,
         currency: currency as Currency,
         status: 'draft',
         subtotal: Math.round(subtotal * 100) / 100,
@@ -80,18 +83,42 @@ export class QuotesService {
           },
         },
       },
-      include: { items: true, contact: { select: { id: true, name: true, email: true } } },
+      include: { items: true, lead: { select: { id: true, name: true, email: true, companyName: true } } },
     });
   }
 
-  async findAll(tenantId: string, contactId?: string) {
+  async findAll(tenantId: string, user?: any, filters?: { search?: string; status?: string; dateFrom?: string; dateTo?: string }) {
     const where: any = { tenantId };
-    if (contactId) where.contactId = contactId;
+    if (user?.isPortal) {
+      where.leadId = user.id;
+    } else if (user?.role === 'seller') {
+      where.OR = [
+        { createdById: user.id },
+        { lead: { ownerId: user.id } }
+      ];
+    }
+    if (filters?.status) where.status = filters.status;
+    if (filters?.search) {
+      const searchOR = [
+        { number: { contains: filters.search, mode: 'insensitive' } },
+        { lead: { name: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: searchOR }];
+        delete where.OR;
+      } else {
+        where.OR = searchOR;
+      }
+    }
+    if (filters?.dateFrom || filters?.dateTo) {
+      where.createdAt = {};
+      if (filters.dateFrom) where.createdAt.gte = new Date(filters.dateFrom);
+      if (filters.dateTo) where.createdAt.lte = new Date(filters.dateTo);
+    }
     return this.prisma.quote.findMany({
       where,
       include: {
-        contact: { select: { id: true, name: true, email: true } },
-        deal: { select: { id: true, title: true } },
+        lead: { select: { id: true, name: true, email: true } },
         items: true,
         approvalRequest: { select: { id: true, status: true } },
       },
@@ -99,14 +126,20 @@ export class QuotesService {
     });
   }
 
-  async findById(id: string, tenantId: string, contactId?: string) {
+  async findById(id: string, tenantId: string, user?: any) {
     const where: any = { id, tenantId };
-    if (contactId) where.contactId = contactId;
+    if (user?.isPortal) {
+      where.leadId = user.id;
+    } else if (user?.role === 'seller') {
+      where.OR = [
+        { createdById: user.id },
+        { lead: { ownerId: user.id } }
+      ];
+    }
     const quote = await this.prisma.quote.findFirst({
       where,
       include: {
-        contact: { select: { id: true, name: true, email: true, companyName: true } },
-        deal: { select: { id: true, title: true, stage: true } },
+        lead: { select: { id: true, name: true, email: true, companyName: true, status: true } },
         items: { include: { product: { select: { id: true, name: true, sku: true } } } },
         versions: { orderBy: { versionNumber: 'desc' } },
         approvalRequest: { include: { actions: { include: { user: { select: { id: true, name: true } } } } } },
@@ -154,8 +187,7 @@ export class QuotesService {
     return this.prisma.quote.update({
       where: { id },
       data: {
-        dealId: dto.dealId,
-        contactId: dto.contactId,
+        leadId: dto.leadId,
         currency: currency as Currency,
         subtotal: Math.round(subtotal * 100) / 100,
         discountTotal: Math.round(discountTotal * 100) / 100,
@@ -185,7 +217,7 @@ export class QuotesService {
       data: { status: 'sent' },
     });
 
-    if (quote.contact?.email) {
+    if (quote.lead?.email) {
       await this.sendQuoteEmail(quote);
     }
 
@@ -220,7 +252,9 @@ export class QuotesService {
     });
 
     await this.prisma.approvalRequest.update({ where: { id: request.id }, data: { status: 'approved' } });
-    await this.prisma.quote.update({ where: { id }, data: { status: 'approved' } });
+    const quote = await this.prisma.quote.update({ where: { id }, data: { status: 'approved' } });
+
+    await this.webhooksService.emit('quote.approved', { ...quote, entity: 'quote', entityId: quote.id }, tenantId);
 
     return { message: 'Quote approved' };
   }
@@ -262,14 +296,13 @@ export class QuotesService {
       // Info Section
       doc.fillColor('#333333');
       doc.fontSize(10).font('Helvetica-Bold').text('Preparado para:', 50, 130);
-      doc.font('Helvetica').text(quote.contact?.name || 'Cliente sin nombre', 50, 145);
-      if (quote.contact?.companyName) doc.text(quote.contact.companyName, 50, 160);
-      if (quote.contact?.email) doc.text(quote.contact.email, 50, 175);
+      doc.font('Helvetica').text(quote.lead?.name || 'Cliente sin nombre', 50, 145);
+      if (quote.lead?.companyName) doc.text(quote.lead.companyName, 50, 160);
+      if (quote.lead?.email) doc.text(quote.lead.email, 50, 175);
 
       doc.font('Helvetica-Bold').text('Detalles:', 350, 130);
       doc.font('Helvetica').text(`Fecha: ${new Date(quote.createdAt).toLocaleDateString()}`, 350, 145);
       doc.text(`Moneda: ${quote.currency}`, 350, 160);
-      doc.text(`Negocio: ${quote.deal?.title || 'N/A'}`, 350, 175);
 
       doc.moveDown(3);
 
@@ -317,8 +350,10 @@ export class QuotesService {
         doc.text(`-$${quote.discountTotal.toLocaleString()}`, tX + 100, y, { width: 90, align: 'right' });
       }
 
+      const taxableAmount = quote.subtotal - quote.discountTotal;
+      const taxPercent = taxableAmount > 0 ? Math.round((quote.taxTotal / taxableAmount) * 1000) / 10 : 0;
       y += 20;
-      doc.text(`Impuesto (${quote.taxTotal > 0 ? quote.items[0]?.taxPercent || 0 : 0}%):`, tX, y, { width: 100 });
+      doc.text(`Impuesto (${taxPercent}%):`, tX, y, { width: 100 });
       doc.text(`$${quote.taxTotal.toLocaleString()}`, tX + 100, y, { width: 90, align: 'right' });
 
       y += 20;
@@ -374,16 +409,17 @@ export class QuotesService {
     return { url: session.url };
   }
 
-  async handleStripeWebhook(event: Stripe.Event) {
+  async handleStripeWebhook(event: any) {
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
+      const session = event.data.object as { client_reference_id: string | null; payment_intent: string | null };
       const quoteId = session.client_reference_id;
       if (quoteId) {
-        await this.prisma.quote.update({
+        const quote = await this.prisma.quote.update({
           where: { id: quoteId },
           data: { status: 'converted', stripePaymentIntentId: session.payment_intent as string },
         });
         this.logger.log(`Quote ${quoteId} marked as converted via Stripe`);
+        await this.webhooksService.emit('quote.converted', { ...quote, entity: 'quote', entityId: quote.id }, quote.tenantId);
       }
     }
   }

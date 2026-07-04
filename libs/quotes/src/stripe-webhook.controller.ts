@@ -1,11 +1,11 @@
 import { Controller, Post, Req, Res, Headers, BadRequestException } from '@nestjs/common';
 import { QuotesService } from './quotes.service';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import Stripe from 'stripe';
 
 @Controller('webhooks/stripe')
 export class StripeWebhookController {
-  private stripe: Stripe;
+  private stripe: InstanceType<typeof Stripe>;
 
   constructor(private readonly quotesService: QuotesService) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -17,7 +17,7 @@ export class StripeWebhookController {
   async handleWebhook(@Req() req: Request, @Res() res: Response, @Headers('stripe-signature') signature: string) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    let event: Stripe.Event;
+    let event: any;
 
     if (webhookSecret) {
       try {

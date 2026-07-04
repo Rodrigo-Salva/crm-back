@@ -3,11 +3,7 @@ import { IsString, IsOptional, IsArray, IsNumber, IsObject } from 'class-validat
 export class CreateQuoteDto {
   @IsString()
   @IsOptional()
-  dealId?: string;
-
-  @IsString()
-  @IsOptional()
-  contactId?: string;
+  leadId?: string;
 
   @IsString()
   @IsOptional()
