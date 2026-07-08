@@ -23,20 +23,60 @@ export class TicketsService {
     this.realtime.notifyUser(assignedTo, 'notification:new', notification);
   }
 
+  private static readonly DEFAULT_SLA_POLICY: Record<string, { responseHours: number; resolutionHours: number }> = {
+    low: { responseHours: 24, resolutionHours: 72 },
+    medium: { responseHours: 8, resolutionHours: 48 },
+    high: { responseHours: 4, resolutionHours: 24 },
+    critical: { responseHours: 1, resolutionHours: 8 },
+  };
+
+  async getSlaPolicy(tenantId: string) {
+    const setting = await this.prisma.tenantSetting.findUnique({
+      where: { key_tenantId: { key: 'slaPolicy', tenantId } },
+    });
+    let stored: Record<string, { responseHours: number; resolutionHours: number }> = {};
+    if (setting) {
+      try {
+        stored = JSON.parse(setting.value);
+      } catch {
+        stored = {};
+      }
+    }
+    const merged: Record<string, { responseHours: number; resolutionHours: number }> = {};
+    for (const priority of Object.keys(TicketsService.DEFAULT_SLA_POLICY)) {
+      merged[priority] = { ...TicketsService.DEFAULT_SLA_POLICY[priority], ...(stored[priority] || {}) };
+    }
+    return merged;
+  }
+
+  async setSlaPolicy(tenantId: string, policy: Record<string, { responseHours: number; resolutionHours: number }>) {
+    await this.prisma.tenantSetting.upsert({
+      where: { key_tenantId: { key: 'slaPolicy', tenantId } },
+      create: { key: 'slaPolicy', value: JSON.stringify(policy), tenantId },
+      update: { value: JSON.stringify(policy) },
+    });
+    return this.getSlaPolicy(tenantId);
+  }
+
   async create(dto: any, userId: string, tenantId: string) {
-    const slaHours: Record<string, number> = { low: 72, medium: 48, high: 24, critical: 8 };
+    const priority = dto.priority || 'medium';
+    const policy = await this.getSlaPolicy(tenantId);
+    const { responseHours, resolutionHours } = policy[priority] || TicketsService.DEFAULT_SLA_POLICY.medium;
     const slaDeadline = new Date();
-    slaDeadline.setHours(slaDeadline.getHours() + (slaHours[dto.priority || 'medium'] || 48));
+    slaDeadline.setHours(slaDeadline.getHours() + resolutionHours);
+    const firstResponseDeadline = new Date();
+    firstResponseDeadline.setHours(firstResponseDeadline.getHours() + responseHours);
 
     const ticket = await this.prisma.ticket.create({
       data: {
         subject: dto.subject,
         description: dto.description,
-        priority: dto.priority || 'medium',
+        priority,
         leadId: dto.leadId,
         assignedTo: dto.assignedTo,
         tenantId,
         slaDeadline,
+        firstResponseDeadline,
       },
       include: { lead: { select: { id: true, name: true, email: true } } },
     });
@@ -118,8 +158,8 @@ export class TicketsService {
   }
 
   async addMessage(ticketId: string, dto: { content: string; isInternal?: boolean }, userId: string | null, tenantId: string) {
-    await this.findById(ticketId, tenantId);
-    return this.prisma.ticketMessage.create({
+    const ticket = await this.findById(ticketId, tenantId);
+    const message = await this.prisma.ticketMessage.create({
       data: {
         ticketId,
         authorId: userId,
@@ -128,19 +168,32 @@ export class TicketsService {
       },
       include: { author: { select: { id: true, name: true } } },
     });
+
+    if (!dto.isInternal && userId && !ticket.firstRespondedAt) {
+      await this.prisma.ticket.update({ where: { id: ticketId }, data: { firstRespondedAt: new Date() } });
+    }
+
+    return message;
   }
 
   async getSlaStatus(tenantId: string) {
     const now = new Date();
     const tickets = await this.prisma.ticket.findMany({
       where: { tenantId, status: { notIn: ['resolved', 'closed'] } },
-      select: { id: true, number: true, subject: true, priority: true, slaDeadline: true, status: true },
+      select: {
+        id: true, number: true, subject: true, priority: true, status: true,
+        slaDeadline: true, firstResponseDeadline: true, firstRespondedAt: true,
+      },
     });
 
     return tickets.map((t) => ({
       ...t,
       slaBreached: t.slaDeadline ? t.slaDeadline < now : false,
       slaRemainingHours: t.slaDeadline ? Math.round((t.slaDeadline.getTime() - now.getTime()) / 3600000) : null,
+      firstResponseBreached: t.firstResponseDeadline && !t.firstRespondedAt ? t.firstResponseDeadline < now : false,
+      firstResponseRemainingHours: t.firstResponseDeadline && !t.firstRespondedAt
+        ? Math.round((t.firstResponseDeadline.getTime() - now.getTime()) / 3600000)
+        : null,
     }));
   }
 

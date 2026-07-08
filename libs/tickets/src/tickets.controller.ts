@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from '@crm/auth';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto, AddMessageDto, UpdateTicketDto } from './dto/create-ticket.dto';
-import { PermissionsGuard } from '@crm/role-permissions';
+import { PermissionsGuard, RequirePermission } from '@crm/role-permissions';
 
 @ApiTags('Tickets')
 @ApiBearerAuth()
@@ -32,6 +32,20 @@ export class TicketsController {
   @ApiOperation({ summary: 'Estado de cumplimiento de SLA' })
   getSla(@CurrentUser() user: any) {
     return this.service.getSlaStatus(user.tenantId);
+  }
+
+  @Get('sla-policy')
+  @RequirePermission('manage_settings')
+  @ApiOperation({ summary: 'Obtiene la política de SLA configurada por prioridad' })
+  getSlaPolicy(@CurrentUser() user: any) {
+    return this.service.getSlaPolicy(user.tenantId);
+  }
+
+  @Patch('sla-policy')
+  @RequirePermission('manage_settings')
+  @ApiOperation({ summary: 'Configura la política de SLA por prioridad' })
+  setSlaPolicy(@Body() dto: Record<string, { responseHours: number; resolutionHours: number }>, @CurrentUser() user: any) {
+    return this.service.setSlaPolicy(user.tenantId, dto);
   }
 
   @Get(':id')

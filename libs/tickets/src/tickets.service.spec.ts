@@ -13,6 +13,8 @@ describe('TicketsService', () => {
   beforeEach(() => {
     prisma = {
       ticket: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn(), findMany: jest.fn() },
+      ticketMessage: { create: jest.fn() },
+      tenantSetting: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
     };
     automation = { evaluate: jest.fn() };
     audit = { log: jest.fn() };

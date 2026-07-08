@@ -28,12 +28,89 @@ export class SchedulerService implements OnModuleInit {
     cron.schedule('0 6 * * *', () => this.generateRecurringInvoices());
     cron.schedule('0 7 * * *', () => this.recalculateHealthScores());
     cron.schedule('0 8 * * *', () => this.notifyUpcomingRenewalsAndOverdueInvoices());
+    cron.schedule('*/15 * * * *', () => this.checkTicketSlaBreaches());
     this.logger.log('Reminder scheduler started (every 5 minutes)');
     this.logger.log('IMAP sync scheduler started (every 10 minutes)');
     this.logger.log('Stale lead follow-up scheduler started (daily at 09:00)');
     this.logger.log('Recurring invoice generator started (daily at 06:00)');
     this.logger.log('Customer health score recalculation started (daily at 07:00)');
     this.logger.log('Invoice renewal/overdue check started (daily at 08:00)');
+    this.logger.log('Ticket SLA breach check started (every 15 minutes)');
+  }
+
+  private static readonly SLA_ESCALATION_GRACE_HOURS = 1;
+
+  private async checkTicketSlaBreaches() {
+    try {
+      const now = new Date();
+      const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
+
+      for (const tenant of tenants) {
+        const openTickets = await this.prisma.ticket.findMany({
+          where: {
+            tenantId: tenant.id,
+            status: { notIn: ['resolved', 'closed'] },
+            OR: [
+              { slaDeadline: { lt: now }, slaBreachNotifiedAt: null },
+              { firstResponseDeadline: { lt: now }, firstRespondedAt: null, slaBreachNotifiedAt: null },
+            ],
+          },
+          include: { team: true },
+        });
+
+        for (const ticket of openTickets) {
+          if (ticket.assignedTo) {
+            await this.notificationsService.create({
+              userId: ticket.assignedTo,
+              title: 'SLA vencido',
+              body: `El ticket #${ticket.number} "${ticket.subject}" superó el tiempo de SLA.`,
+              link: `/tickets/${ticket.id}`,
+            });
+          }
+          await this.prisma.ticket.update({ where: { id: ticket.id }, data: { slaBreachNotifiedAt: now } });
+        }
+
+        const graceMs = SchedulerService.SLA_ESCALATION_GRACE_HOURS * 3600000;
+        const escalationCutoff = new Date(now.getTime() - graceMs);
+        const toEscalate = await this.prisma.ticket.findMany({
+          where: {
+            tenantId: tenant.id,
+            status: { notIn: ['resolved', 'closed'] },
+            escalatedAt: null,
+            slaDeadline: { lt: escalationCutoff },
+          },
+          include: { team: true },
+        });
+
+        for (const ticket of toEscalate) {
+          const supervisorId = ticket.team?.leadId;
+          if (supervisorId) {
+            await this.notificationsService.create({
+              userId: supervisorId,
+              title: 'Ticket escalado',
+              body: `El ticket #${ticket.number} "${ticket.subject}" lleva más de ${SchedulerService.SLA_ESCALATION_GRACE_HOURS}h vencido sin resolverse.`,
+              link: `/tickets/${ticket.id}`,
+            });
+          } else {
+            const admins = await this.prisma.user.findMany({
+              where: { tenantId: tenant.id, role: { in: ['admin', 'superadmin'] } },
+              select: { id: true },
+            });
+            for (const admin of admins) {
+              await this.notificationsService.create({
+                userId: admin.id,
+                title: 'Ticket escalado',
+                body: `El ticket #${ticket.number} "${ticket.subject}" lleva más de ${SchedulerService.SLA_ESCALATION_GRACE_HOURS}h vencido sin resolverse y su equipo no tiene un líder asignado.`,
+                link: `/tickets/${ticket.id}`,
+              });
+            }
+          }
+          await this.prisma.ticket.update({ where: { id: ticket.id }, data: { escalatedAt: now } });
+        }
+      }
+    } catch (err) {
+      this.logger.error('Ticket SLA breach check failed', err);
+    }
   }
 
   private async recalculateHealthScores() {
