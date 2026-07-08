@@ -38,35 +38,41 @@ export class LeadsService {
       status = firstStage?.name ?? 'new';
     }
 
-    const lead = await this.prisma.lead.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        phone: dto.phone,
-        company: dto.company,
-        source: dto.source || 'web',
-        status,
-        score: dto.score ?? 0,
-        notes: dto.notes,
-        value: dto.value ?? 0,
-        currency: currency as Currency,
-        expectedCloseDate: dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : undefined,
-        customFields: dto.customFields,
-        campaignId: dto.campaignId,
-        companyId: dto.companyId,
-        companyName: dto.companyName,
-        position: dto.position,
-        customerStatus: dto.customerStatus as any,
-        utmSource: dto.utmSource,
-        utmMedium: dto.utmMedium,
-        utmCampaign: dto.utmCampaign,
-        utmTerm: dto.utmTerm,
-        utmContent: dto.utmContent,
-        careerId: dto.careerId,
-        modalityId: dto.modalityId,
-        ownerId,
-        tenantId,
-      },
+    const lead = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.lead.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          phone: dto.phone,
+          company: dto.company,
+          source: dto.source || 'web',
+          status,
+          score: dto.score ?? 0,
+          notes: dto.notes,
+          value: dto.value ?? 0,
+          currency: currency as Currency,
+          expectedCloseDate: dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : undefined,
+          customFields: dto.customFields,
+          campaignId: dto.campaignId,
+          companyId: dto.companyId,
+          companyName: dto.companyName,
+          position: dto.position,
+          customerStatus: dto.customerStatus as any,
+          utmSource: dto.utmSource,
+          utmMedium: dto.utmMedium,
+          utmCampaign: dto.utmCampaign,
+          utmTerm: dto.utmTerm,
+          utmContent: dto.utmContent,
+          careerId: dto.careerId,
+          modalityId: dto.modalityId,
+          ownerId,
+          tenantId,
+        },
+      });
+      await tx.leadStageHistory.create({
+        data: { leadId: created.id, tenantId, fromStage: null, toStage: status, enteredAt: created.createdAt },
+      });
+      return created;
     });
     await this.audit.log({
       entity: 'lead', entityId: lead.id, action: 'created',
@@ -157,7 +163,7 @@ export class LeadsService {
 
   async update(id: string, dto: UpdateLeadDto, user: any) {
     const tenantId = user.tenantId;
-    await this.findById(id, user);
+    const existing = await this.findById(id, user);
 
     const data: any = {
       name: dto.name,
@@ -197,6 +203,17 @@ export class LeadsService {
     await this.webhooks.emit('lead.updated', updated, tenantId);
 
     if (dto.status !== undefined) {
+      if (dto.status !== existing.status) {
+        await this.prisma.$transaction([
+          this.prisma.leadStageHistory.updateMany({
+            where: { leadId: id, exitedAt: null },
+            data: { exitedAt: updated.updatedAt },
+          }),
+          this.prisma.leadStageHistory.create({
+            data: { leadId: id, tenantId, fromStage: existing.status, toStage: dto.status, enteredAt: updated.updatedAt },
+          }),
+        ]);
+      }
       await this.audit.log({
         entity: 'lead', entityId: id, action: 'status_changed',
         changes: { status: dto.status }, userId: updated.ownerId, tenantId,

@@ -20,7 +20,11 @@ describe('LeadsService', () => {
         delete: jest.fn(),
       },
       pipelineStage: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      leadStageHistory: { create: jest.fn(), updateMany: jest.fn() },
     };
+    prisma.$transaction = jest.fn((arg: any) =>
+      typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
+    );
     webhooks = { emit: jest.fn() };
     realtime = { broadcastToTenant: jest.fn() };
     automation = { evaluate: jest.fn() };

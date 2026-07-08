@@ -205,6 +205,7 @@ model Tenant {
   invoices               Invoice[]
   playbooks              Playbook[]
   playbookRuns           PlaybookRun[]
+  leadStageHistory       LeadStageHistory[]
 
   @@map("tenants")
 }
@@ -505,6 +506,24 @@ model PipelineStage {
 
   @@unique([name, tenantId])
   @@map("pipeline_stages")
+}
+
+model LeadStageHistory {
+  id        String    @id @default(uuid())
+  leadId    String    @map("lead_id")
+  tenantId  String    @map("tenant_id")
+  fromStage String?   @map("from_stage")
+  toStage   String    @map("to_stage")
+  enteredAt DateTime  @default(now()) @map("entered_at")
+  exitedAt  DateTime? @map("exited_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, leadId])
+  @@index([tenantId, toStage])
+  @@map("lead_stage_history")
 }
 
 model Activity {
@@ -1103,6 +1122,7 @@ model Lead {
   team               Team?               @relation(fields: [teamId], references: [id])
   contracts          Contract[]
   playbookRuns       PlaybookRun[]
+  stageHistory       LeadStageHistory[]
 
   @@map("leads")
 }

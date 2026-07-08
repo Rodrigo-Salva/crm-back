@@ -63,6 +63,15 @@ export class DashboardController {
     return this.service.getMrrArr(user.tenantId);
   }
 
+  @Get('funnel')
+  getFunnel(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.getFunnel(user.tenantId, from, to);
+  }
+
   @Get('export/:type')
   async export(
     @Param('type') type: string,

@@ -196,6 +196,66 @@ export class DashboardService {
     }));
   }
 
+  async getFunnel(tenantId: string, from?: string, to?: string) {
+    const dateFilter: any = { tenantId };
+    if (from || to) {
+      dateFilter.enteredAt = {};
+      if (from) dateFilter.enteredAt.gte = new Date(from);
+      if (to) dateFilter.enteredAt.lte = new Date(to);
+    }
+
+    const stages = await this.prisma.pipelineStage.findMany({
+      where: { tenantId },
+      orderBy: { order: 'asc' },
+    });
+
+    const history = await this.prisma.leadStageHistory.findMany({
+      where: dateFilter,
+      select: { leadId: true, toStage: true, fromStage: true, enteredAt: true, exitedAt: true },
+    });
+
+    const enteredCount: Record<string, number> = {};
+    const stageDurations: Record<string, number[]> = {};
+    for (const row of history) {
+      enteredCount[row.toStage] = (enteredCount[row.toStage] || 0) + 1;
+      if (row.exitedAt) {
+        const hours = (row.exitedAt.getTime() - row.enteredAt.getTime()) / (1000 * 60 * 60);
+        (stageDurations[row.toStage] ||= []).push(hours);
+      }
+    }
+
+    const stageResults = stages.map((stage, i) => {
+      const entered = enteredCount[stage.name] || 0;
+      const nextStage = stages[i + 1];
+      const nextEntered = nextStage ? enteredCount[nextStage.name] || 0 : null;
+      const conversionRate = nextStage && entered > 0 ? Math.round((nextEntered! / entered) * 1000) / 10 : null;
+      const durations = stageDurations[stage.name] || [];
+      const avgTimeInStageHours = durations.length
+        ? Math.round((durations.reduce((a, b) => a + b, 0) / durations.length) * 10) / 10
+        : null;
+      return { name: stage.name, order: stage.order, color: stage.color, entered, conversionRate, avgTimeInStageHours };
+    });
+
+    const lostStageNames = new Set(stages.filter((s) => s.isLost).map((s) => s.name));
+    const lostTransitions = history.filter((h) => lostStageNames.has(h.toStage));
+    const lostLeadIds = [...new Set(lostTransitions.map((h) => h.leadId))];
+    const lostLeads = lostLeadIds.length
+      ? await this.prisma.lead.findMany({ where: { id: { in: lostLeadIds } }, select: { id: true, value: true } })
+      : [];
+    const leadValueMap = new Map(lostLeads.map((l) => [l.id, l.value]));
+
+    const dropOffMap: Record<string, { lostCount: number; lostValue: number }> = {};
+    for (const t of lostTransitions) {
+      const fromStageName = t.fromStage || '(sin etapa previa)';
+      const entry = (dropOffMap[fromStageName] ||= { lostCount: 0, lostValue: 0 });
+      entry.lostCount += 1;
+      entry.lostValue += leadValueMap.get(t.leadId) || 0;
+    }
+    const dropOff = Object.entries(dropOffMap).map(([stage, data]) => ({ stage, ...data }));
+
+    return { stages: stageResults, dropOff };
+  }
+
   private static readonly MONTHLY_FACTOR: Record<string, number> = {
     weekly: 52 / 12,
     monthly: 1,
