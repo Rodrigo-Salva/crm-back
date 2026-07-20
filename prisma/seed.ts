@@ -118,44 +118,55 @@ async function main() {
     where: { name: 'Implementación CRM', tenantId: tenant.id },
   });
 
-  if (!existingDeal) {
-    await prisma.lead.create({
-      data: {
-        name: 'Implementación CRM',
-        value: 50000,
-        status: 'Nuevo',
+    if (!existingDeal) {
+      await prisma.lead.create({
+        data: {
+          name: 'Implementación CRM',
+          value: 50000,
+          status: 'Nuevo',
+          tenantId: tenant.id,
+          ownerId: admin.id,
+        },
+      });
+      console.log('Lead created');
+    }
+    
+    const softwareCategory = await prisma.productCategory.upsert({
+      where: { name_tenantId: { name: 'Software', tenantId: tenant.id } },
+      update: {},
+      create: {
+        name: 'Software',
         tenantId: tenant.id,
-        ownerId: admin.id,
       },
     });
-    console.log('Lead created');
-  }
 
-  await prisma.product.upsert({
-    where: { sku_tenantId: { sku: 'CRM-BASIC', tenantId: tenant.id } },
-    update: {},
-    create: {
-      name: 'CRM Básico',
-      sku: 'CRM-BASIC',
-      price: 99.00,
-      unit: 'licencia',
-      category: 'Software',
-      tenantId: tenant.id,
-    },
-  });
+    const product1 = await prisma.product.upsert({
+      where: { sku_tenantId: { sku: 'PROD-001', tenantId: tenant.id } },
+      update: {},
+      create: {
+        name: 'CRM Basico',
+        description: 'Licencia anual de CRM',
+        price: 1500,
+        currency: 'USD',
+        categoryId: softwareCategory.id,
+        sku: 'PROD-001',
+        tenantId: tenant.id,
+      },
+    });
 
-  await prisma.product.upsert({
-    where: { sku_tenantId: { sku: 'CRM-PRO', tenantId: tenant.id } },
-    update: {},
-    create: {
-      name: 'CRM Profesional',
-      sku: 'CRM-PRO',
-      price: 299.00,
-      unit: 'licencia',
-      category: 'Software',
-      tenantId: tenant.id,
-    },
-  });
+    const product2 = await prisma.product.upsert({
+      where: { sku_tenantId: { sku: 'PROD-002', tenantId: tenant.id } },
+      update: {},
+      create: {
+        name: 'CRM Pro',
+        description: 'Licencia anual de CRM con IA',
+        price: 3500,
+        currency: 'USD',
+        categoryId: softwareCategory.id,
+        sku: 'PROD-002',
+        tenantId: tenant.id,
+      },
+    });
 
   console.log('Products created');
 
