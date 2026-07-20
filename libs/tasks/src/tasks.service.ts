@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { AutomationService } from '@crm/automation';
+import { GoogleCalendarTaskService } from './google-calendar-task.service';
 import { CreateTaskDto, UpdateTaskDto, QueryTaskDto } from './dto/create-task.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly automation: AutomationService,
+    private readonly googleCalendar: GoogleCalendarTaskService,
   ) {}
 
   async create(dto: CreateTaskDto, assigneeId: string, tenantId: string) {
@@ -26,6 +28,7 @@ export class TasksService {
       },
     });
     await this.automation.evaluate('task.created', { ...task, entity: 'task', entityId: task.id }, tenantId);
+    if (task.dueDate) await this.googleCalendar.syncTask(task.id);
     return task;
   }
 
@@ -80,12 +83,13 @@ export class TasksService {
       },
     });
     await this.automation.evaluate('task.updated', { ...updated, entity: 'task', entityId: id }, tenantId);
+    if (updated.dueDate) await this.googleCalendar.syncTask(updated.id);
     return updated;
   }
 
   async remove(id: string, user: any) {
-    const tenantId = user.tenantId;
     await this.findById(id, user);
+    await this.googleCalendar.deleteTaskEvent(id);
     return this.prisma.task.delete({ where: { id } });
   }
 }
