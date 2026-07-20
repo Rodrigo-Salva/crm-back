@@ -7,9 +7,11 @@ import { WebhooksModule } from '@crm/webhooks';
 import { SharedModule } from '@crm/shared';
 import { NotificationsModule } from '@crm/notifications';
 import { RolePermissionsModule } from '@crm/role-permissions';
+import { TagsModule } from '@crm/tags';
+import { NpsModule } from '@crm/nps';
 
 @Module({
-  imports: [AutomationModule, AuditModule, WebhooksModule, SharedModule, NotificationsModule, RolePermissionsModule],
+  imports: [AutomationModule, AuditModule, WebhooksModule, SharedModule, NotificationsModule, RolePermissionsModule, TagsModule, NpsModule],
   controllers: [TicketsController],
   providers: [TicketsService],
   exports: [TicketsService],

@@ -143,6 +143,8 @@
       "^@crm/lead-forms(|/.*)$": "<rootDir>/libs/lead-forms/src/$1",
       "^@crm/dashboard(|/.*)$": "<rootDir>/libs/dashboard/src/$1",
       "^@crm/products(|/.*)$": "<rootDir>/libs/products/src/$1",
+      "^@crm/product-categories(|/.*)$": "<rootDir>/libs/product-categories/src/$1",
+      "^@crm/projects(|/.*)$": "<rootDir>/libs/projects/src/$1",
       "^@crm/quotes(|/.*)$": "<rootDir>/libs/quotes/src/$1",
       "^@crm/tickets(|/.*)$": "<rootDir>/libs/tickets/src/$1",
       "^@crm/api-keys(|/.*)$": "<rootDir>/libs/api-keys/src/$1",

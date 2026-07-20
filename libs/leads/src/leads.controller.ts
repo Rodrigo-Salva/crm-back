@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from '@crm/auth';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto, UpdateLeadDto, QueryLeadDto } from './dto/create-lead.dto';
-import { PermissionsGuard } from '@crm/role-permissions';
+import { PermissionsGuard, RequirePermission } from '@crm/role-permissions';
 
 @ApiTags('Leads')
 @ApiBearerAuth()
@@ -29,6 +29,13 @@ export class LeadsController {
   @ApiOperation({ summary: 'Resumen del pipeline de ventas' })
   getPipeline(@CurrentUser() user: any) {
     return this.service.getPipeline(user);
+  }
+
+  @Post('recalculate-health')
+  @RequirePermission('manage_settings')
+  @ApiOperation({ summary: 'Recalcula el health score de todos los leads con contrato del tenant' })
+  recalculateAllHealth(@CurrentUser() user: any) {
+    return this.service.recalculateAllForTenant(user.tenantId);
   }
 
   @Get('duplicates')

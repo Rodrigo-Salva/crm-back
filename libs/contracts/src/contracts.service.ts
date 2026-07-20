@@ -59,9 +59,11 @@ export class ContractsService {
     return this.findById(contract.id, tenantId);
   }
 
-  async findAll(tenantId: string, user?: any) {
+  async findAll(tenantId: string, user?: any, filters?: { leadId?: string; companyId?: string }) {
     const where: any = { tenantId };
     if (user?.isPortal) where.leadId = user.id;
+    if (!user?.isPortal && filters?.leadId) where.leadId = filters.leadId;
+    if (!user?.isPortal && filters?.companyId) where.lead = { companyId: filters.companyId };
 
     return this.prisma.contract.findMany({
       where,

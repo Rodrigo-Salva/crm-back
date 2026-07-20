@@ -16,13 +16,8 @@ export class ProductsController {
   }
 
   @Get('products')
-  findAll(@Query('category') category: string, @Query('search') search: string, @CurrentUser() user: any) {
-    return this.service.findAll(user.tenantId, category, search);
-  }
-
-  @Get('products/categories')
-  getCategories(@CurrentUser() user: any) {
-    return this.service.getCategories(user.tenantId);
+  findAll(@Query('categoryId') categoryId: string, @Query('search') search: string, @CurrentUser() user: any) {
+    return this.service.findAll(user.tenantId, categoryId, search);
   }
 
   @Get('products/:id')

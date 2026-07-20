@@ -2,6 +2,9 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '@crm/shared';
 import { Currency } from '@prisma/client';
 import { WebhooksService } from '@crm/webhooks';
+import { CommissionsService } from '@crm/commissions';
+import { ReferralsService } from '@crm/referrals';
+import { InvoicingService } from '@crm/invoicing';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import Stripe from 'stripe';
 const PDFDocument = require('pdfkit');
@@ -15,6 +18,9 @@ export class QuotesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooksService: WebhooksService,
+    private readonly commissions: CommissionsService,
+    private readonly referrals: ReferralsService,
+    private readonly invoicing: InvoicingService,
   ) {
     this.appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -73,6 +79,7 @@ export class QuotesService {
         grandTotal: Math.round(grandTotal * 100) / 100,
         discountPercent: dto.discountPercent || 0,
         notes: dto.notes,
+        requiresSignature: dto.requiresSignature || false,
         createdById: userId,
         tenantId,
         items: { create: items },
@@ -87,7 +94,7 @@ export class QuotesService {
     });
   }
 
-  async findAll(tenantId: string, user?: any, filters?: { search?: string; status?: string; dateFrom?: string; dateTo?: string }) {
+  async findAll(tenantId: string, user?: any, filters?: { search?: string; status?: string; dateFrom?: string; dateTo?: string; leadId?: string; companyId?: string }) {
     const where: any = { tenantId };
     if (user?.isPortal) {
       where.leadId = user.id;
@@ -97,6 +104,8 @@ export class QuotesService {
         { lead: { ownerId: user.id } }
       ];
     }
+    if (!user?.isPortal && filters?.leadId) where.leadId = filters.leadId;
+    if (!user?.isPortal && filters?.companyId) where.lead = { companyId: filters.companyId };
     if (filters?.status) where.status = filters.status;
     if (filters?.search) {
       const searchOR = [
@@ -195,6 +204,7 @@ export class QuotesService {
         grandTotal: Math.round(grandTotal * 100) / 100,
         discountPercent: dto.discountPercent || 0,
         notes: dto.notes,
+        requiresSignature: dto.requiresSignature || false,
         version: newVersion,
         items: { create: items },
         versions: {
@@ -420,6 +430,9 @@ export class QuotesService {
         });
         this.logger.log(`Quote ${quoteId} marked as converted via Stripe`);
         await this.webhooksService.emit('quote.converted', { ...quote, entity: 'quote', entityId: quote.id }, quote.tenantId);
+        await this.commissions.calculateForQuote(quote, quote.tenantId);
+        await this.referrals.calculateForQuote(quote, quote.tenantId);
+        await this.invoicing.createForQuote(quote, quote.tenantId);
       }
     }
   }

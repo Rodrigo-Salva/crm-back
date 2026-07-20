@@ -3,6 +3,7 @@ import { PrismaService, RealtimeGateway } from '@crm/shared';
 import { WebhooksService } from '@crm/webhooks';
 import { AutomationService } from '@crm/automation';
 import { AuditService } from '@crm/audit';
+import { TagsService } from '@crm/tags';
 import { Currency } from '@prisma/client';
 import { CreateLeadDto, UpdateLeadDto, QueryLeadDto } from './dto/create-lead.dto';
 
@@ -21,7 +22,27 @@ export class LeadsService {
     private readonly realtime: RealtimeGateway,
     private readonly automation: AutomationService,
     private readonly audit: AuditService,
+    private readonly tags: TagsService,
   ) {}
+
+  private async checkStageQuota(tenantId: string, stageName: string) {
+    const stage = await this.prisma.pipelineStage.findFirst({ where: { tenantId, name: stageName } });
+    if (!stage?.maxLeads) return;
+    const count = await this.prisma.lead.count({ where: { tenantId, status: stageName } });
+    if (count >= stage.maxLeads) {
+      throw new BadRequestException(`La etapa "${stageName}" alcanzó su cupo máximo de ${stage.maxLeads} leads.`);
+    }
+  }
+
+  private async validateSubPhase(tenantId: string, stageName: string, subPhaseId: string) {
+    const subPhase = await this.prisma.pipelineSubPhase.findFirst({
+      where: { id: subPhaseId, tenantId },
+      include: { pipelineStage: true },
+    });
+    if (!subPhase || subPhase.pipelineStage.name !== stageName) {
+      throw new BadRequestException('La sub-fase no pertenece a la etapa seleccionada.');
+    }
+  }
 
   async create(dto: CreateLeadDto, ownerId: string, tenantId: string) {
     const currency = dto.currency ?? 'MXN';
@@ -36,6 +57,10 @@ export class LeadsService {
         orderBy: { order: 'asc' },
       });
       status = firstStage?.name ?? 'new';
+    }
+    await this.checkStageQuota(tenantId, status);
+    if (dto.subPhaseId) {
+      await this.validateSubPhase(tenantId, status, dto.subPhaseId);
     }
 
     const lead = await this.prisma.$transaction(async (tx) => {
@@ -65,6 +90,8 @@ export class LeadsService {
           utmContent: dto.utmContent,
           careerId: dto.careerId,
           modalityId: dto.modalityId,
+          subPhaseId: dto.subPhaseId,
+          referredByLeadId: dto.referredByLeadId,
           ownerId,
           tenantId,
         },
@@ -85,7 +112,7 @@ export class LeadsService {
 
   async findAll(query: QueryLeadDto, user: any) {
     const tenantId = user.tenantId;
-    const { search, status, source, campaignId, companyId, customerStatus, careerId, modalityId, page = 1, limit = 20 } = query;
+    const { search, status, source, campaignId, companyId, customerStatus, careerId, modalityId, tagId, page = 1, limit = 20 } = query;
     const where: any = { tenantId };
     if (user.role === 'seller') {
       where.ownerId = user.id;
@@ -97,6 +124,10 @@ export class LeadsService {
     if (customerStatus) where.customerStatus = customerStatus;
     if (careerId) where.careerId = careerId;
     if (modalityId) where.modalityId = modalityId;
+    if (tagId) {
+      const entityIds = await this.tags.entityIdsForTag('lead', tagId, tenantId);
+      where.id = { in: entityIds };
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -130,6 +161,7 @@ export class LeadsService {
         where: { tenantId, ...(user.role === 'seller' ? { ownerId: user.id } : {}) },
         include: {
           owner: { select: { id: true, name: true } },
+          subPhase: { select: { id: true, name: true } },
         },
         orderBy: { updatedAt: 'desc' },
       }),
@@ -154,7 +186,9 @@ export class LeadsService {
         campaign: { select: { id: true, name: true, channel: true } },
         career: { select: { id: true, name: true } },
         modality: { select: { id: true, name: true } },
+        subPhase: { select: { id: true, name: true } },
         activities: { orderBy: { createdAt: 'desc' }, take: 10 },
+        referredByLead: { select: { id: true, name: true } },
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -188,6 +222,9 @@ export class LeadsService {
       utmContent: dto.utmContent,
       careerId: dto.careerId,
       modalityId: dto.modalityId,
+      subPhaseId: dto.subPhaseId,
+      referredByLeadId: dto.referredByLeadId,
+      isPartner: dto.isPartner,
     };
     if (dto.currency !== undefined) {
       if (!VALID_CURRENCIES.includes(dto.currency)) {
@@ -197,6 +234,17 @@ export class LeadsService {
     }
     if (dto.expectedCloseDate) data.expectedCloseDate = new Date(dto.expectedCloseDate);
     Object.keys(data).forEach((key) => data[key] === undefined && delete data[key]);
+
+    if (dto.status !== undefined && dto.status !== existing.status) {
+      await this.checkStageQuota(tenantId, dto.status);
+      if (dto.subPhaseId) {
+        await this.validateSubPhase(tenantId, dto.status, dto.subPhaseId);
+      } else if (dto.subPhaseId === undefined) {
+        data.subPhaseId = null;
+      }
+    } else if (dto.subPhaseId) {
+      await this.validateSubPhase(tenantId, dto.status ?? existing.status, dto.subPhaseId);
+    }
 
     const updated = await this.prisma.lead.update({ where: { id }, data });
     await this.automation.evaluate('lead.updated', { ...updated, entity: 'lead', entityId: id }, tenantId);
@@ -246,31 +294,24 @@ export class LeadsService {
     return omitPortalPassword(updated);
   }
 
-  async recalculateHealth(id: string, user: any) {
-    const tenantId = user.tenantId;
-    await this.findById(id, user);
-
+  private async computeHealth(leadId: string, tenantId: string): Promise<{ score: number | null; status: string }> {
     const contracts = await this.prisma.contract.findMany({
-      where: { leadId: id, tenantId },
+      where: { leadId, tenantId },
       include: { subscription: { include: { invoices: true } } },
     });
 
     if (contracts.length === 0) {
-      const updated = await this.prisma.lead.update({
-        where: { id },
-        data: { healthScore: null, healthStatus: 'unknown' },
-      });
-      return omitPortalPassword(updated);
+      return { score: null, status: 'unknown' };
     }
 
     const lastActivity = await this.prisma.activity.findFirst({
-      where: { leadId: id, tenantId },
+      where: { leadId, tenantId },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
     });
 
     const openTickets = await this.prisma.ticket.findMany({
-      where: { leadId: id, tenantId, status: { in: ['open', 'in_progress'] } },
+      where: { leadId, tenantId, status: { in: ['open', 'in_progress'] } },
       select: { priority: true },
     });
 
@@ -309,16 +350,52 @@ export class LeadsService {
           s.invoices.some((i) => i.status === 'paid' && i.paidAt && Date.now() - i.paidAt.getTime() <= 35 * 24 * 3600000),
       );
       if (overdueCount === 0 && hasRecentPayment) score += 5;
+
+      const hasUpcomingRenewal = subscriptions.some(
+        (s) =>
+          s.status === 'active' &&
+          s.nextBillingDate &&
+          s.nextBillingDate.getTime() - Date.now() <= 14 * 24 * 3600000 &&
+          s.nextBillingDate.getTime() >= Date.now(),
+      );
+      if (hasUpcomingRenewal) score -= 10;
     }
 
     score = Math.max(0, Math.min(100, score));
-    const healthStatus = score >= 70 ? 'healthy' : score >= 40 ? 'at_risk' : 'critical';
+    const status = score >= 70 ? 'healthy' : score >= 40 ? 'at_risk' : 'critical';
 
+    return { score, status };
+  }
+
+  async recalculateHealth(id: string, user: any) {
+    const tenantId = user.tenantId;
+    await this.findById(id, user);
+
+    const { score, status } = await this.computeHealth(id, tenantId);
     const updated = await this.prisma.lead.update({
       where: { id },
-      data: { healthScore: score, healthStatus },
+      data: { healthScore: score, healthStatus: status as any },
     });
     return omitPortalPassword(updated);
+  }
+
+  async recalculateAllForTenant(tenantId: string) {
+    const contracts = await this.prisma.contract.findMany({
+      where: { tenantId },
+      select: { leadId: true },
+      distinct: ['leadId'],
+    });
+
+    let updated = 0;
+    for (const { leadId } of contracts) {
+      const { score, status } = await this.computeHealth(leadId, tenantId);
+      await this.prisma.lead.update({
+        where: { id: leadId },
+        data: { healthScore: score, healthStatus: status as any },
+      });
+      updated++;
+    }
+    return { updated };
   }
 
   async findDuplicates(tenantId: string) {

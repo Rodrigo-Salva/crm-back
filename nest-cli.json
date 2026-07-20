@@ -186,6 +186,60 @@
         "tsConfigPath": "libs/sales-goals/tsconfig.lib.json"
       }
     },
+    "commissions": {
+      "type": "library",
+      "root": "libs/commissions",
+      "entryFile": "index",
+      "sourceRoot": "libs/commissions/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/commissions/tsconfig.lib.json"
+      }
+    },
+    "referrals": {
+      "type": "library",
+      "root": "libs/referrals",
+      "entryFile": "index",
+      "sourceRoot": "libs/referrals/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/referrals/tsconfig.lib.json"
+      }
+    },
+    "saved-views": {
+      "type": "library",
+      "root": "libs/saved-views",
+      "entryFile": "index",
+      "sourceRoot": "libs/saved-views/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/saved-views/tsconfig.lib.json"
+      }
+    },
+    "invoicing": {
+      "type": "library",
+      "root": "libs/invoicing",
+      "entryFile": "index",
+      "sourceRoot": "libs/invoicing/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/invoicing/tsconfig.lib.json"
+      }
+    },
+    "nps": {
+      "type": "library",
+      "root": "libs/nps",
+      "entryFile": "index",
+      "sourceRoot": "libs/nps/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/nps/tsconfig.lib.json"
+      }
+    },
+    "tags": {
+      "type": "library",
+      "root": "libs/tags",
+      "entryFile": "index",
+      "sourceRoot": "libs/tags/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/tags/tsconfig.lib.json"
+      }
+    },
     "lead-forms": {
       "type": "library",
       "root": "libs/lead-forms",
@@ -211,6 +265,15 @@
       "sourceRoot": "libs/products/src",
       "compilerOptions": {
         "tsConfigPath": "libs/products/tsconfig.lib.json"
+      }
+    },
+    "product-categories": {
+      "type": "library",
+      "root": "libs/product-categories",
+      "entryFile": "index",
+      "sourceRoot": "libs/product-categories/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/product-categories/tsconfig.lib.json"
       }
     },
     "quotes": {

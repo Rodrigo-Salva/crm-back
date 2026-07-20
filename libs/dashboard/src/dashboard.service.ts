@@ -38,6 +38,27 @@ export class DashboardService {
     };
   }
 
+  async getAccountHealth(tenantId: string) {
+    const [byStatus, avg] = await Promise.all([
+      this.prisma.lead.groupBy({
+        by: ['healthStatus'],
+        where: { tenantId, healthStatus: { not: 'unknown' } },
+        _count: true,
+      }),
+      this.prisma.lead.aggregate({
+        where: { tenantId, healthStatus: { not: 'unknown' } },
+        _avg: { healthScore: true },
+      }),
+    ]);
+
+    const counts = { healthy: 0, at_risk: 0, critical: 0 };
+    byStatus.forEach((b) => {
+      if (b.healthStatus in counts) counts[b.healthStatus as keyof typeof counts] = b._count;
+    });
+
+    return { counts, averageScore: avg._avg.healthScore ?? null };
+  }
+
   async getPipelineStages(tenantId: string) {
     const stages = await this.prisma.pipelineStage.findMany({
       where: { tenantId },

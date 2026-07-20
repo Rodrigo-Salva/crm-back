@@ -6,6 +6,10 @@ export class QueryCompanyDto {
   @IsOptional()
   search?: string;
 
+  @IsString()
+  @IsOptional()
+  tagId?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

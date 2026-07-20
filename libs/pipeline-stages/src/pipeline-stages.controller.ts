@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { PipelineStagesService } from './pipeline-stages.service';
 import { CreatePipelineStageDto } from './dto/create-pipeline-stage.dto';
 import { UpdatePipelineStageDto } from './dto/update-pipeline-stage.dto';
+import { CreatePipelineSubPhaseDto } from './dto/create-pipeline-sub-phase.dto';
+import { UpdatePipelineSubPhaseDto } from './dto/update-pipeline-sub-phase.dto';
 import { CurrentUser } from '@crm/auth';
 import { PermissionsGuard, RequirePermission } from '@crm/role-permissions';
 
@@ -32,5 +34,33 @@ export class PipelineStagesController {
   @RequirePermission('manage_settings')
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.service.remove(id, user.tenantId);
+  }
+
+  @Get(':stageId/sub-phases')
+  findSubPhases(@Param('stageId') stageId: string, @CurrentUser() user: any) {
+    return this.service.findSubPhases(stageId, user.tenantId);
+  }
+
+  @Post(':stageId/sub-phases')
+  @RequirePermission('manage_settings')
+  createSubPhase(@Param('stageId') stageId: string, @Body() dto: CreatePipelineSubPhaseDto, @CurrentUser() user: any) {
+    return this.service.createSubPhase(stageId, dto, user.tenantId);
+  }
+
+  @Patch(':stageId/sub-phases/:id')
+  @RequirePermission('manage_settings')
+  updateSubPhase(
+    @Param('stageId') stageId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdatePipelineSubPhaseDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.updateSubPhase(stageId, id, dto, user.tenantId);
+  }
+
+  @Delete(':stageId/sub-phases/:id')
+  @RequirePermission('manage_settings')
+  removeSubPhase(@Param('stageId') stageId: string, @Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.removeSubPhase(stageId, id, user.tenantId);
   }
 }

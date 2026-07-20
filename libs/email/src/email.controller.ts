@@ -87,4 +87,13 @@ export class EmailTrackingController {
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(pixel);
   }
+
+  @Get('email/click/:trackingId')
+  async trackClick(@Param('trackingId') trackingId: string, @Query('url') url: string, @Res() res: Response) {
+    if (!url || !/^https?:\/\//i.test(url)) {
+      return res.status(400).send('Invalid url');
+    }
+    await this.emailService.trackClick(trackingId);
+    res.redirect(url);
+  }
 }

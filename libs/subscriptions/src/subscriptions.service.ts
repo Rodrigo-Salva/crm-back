@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { NotificationsService } from '@crm/notifications';
+import { NubefactService } from '@crm/invoicing';
 import { BillingInterval, Currency } from '@prisma/client';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly nubefact: NubefactService,
   ) {}
 
   static addInterval(date: Date, interval: BillingInterval): Date {
@@ -107,6 +109,10 @@ export class SubscriptionsService {
       },
     });
 
+    try {
+      await this.nubefact.issueInvoice(invoice.id, tenantId);
+    } catch {}
+
     await this.prisma.subscription.update({
       where: { id: subscription.id },
       data: {
@@ -150,11 +156,27 @@ export class SubscriptionsService {
     return `INV-${String(lastNum + 1).padStart(5, '0')}`;
   }
 
+  async findAllSubscriptions(tenantId: string) {
+    return this.prisma.subscription.findMany({
+      where: { tenantId },
+      include: { contract: { include: { lead: true } }, invoices: { orderBy: { dueDate: 'desc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findInvoicesBySubscription(subscriptionId: string, tenantId: string) {
     return this.prisma.invoice.findMany({
       where: { subscriptionId, tenantId },
       orderBy: { dueDate: 'desc' },
       include: { payments: true },
+    });
+  }
+
+  async findAllInvoices(tenantId: string) {
+    return this.prisma.invoice.findMany({
+      where: { tenantId },
+      orderBy: { dueDate: 'desc' },
+      include: { payments: true, subscription: { include: { contract: { include: { lead: true } } } } },
     });
   }
 
@@ -175,7 +197,7 @@ export class SubscriptionsService {
       },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    if (user?.isPortal && invoice.subscription.contract.leadId !== user.id) {
+    if (user?.isPortal && invoice.subscription?.contract.leadId !== user.id) {
       throw new ForbiddenException('Not your invoice');
     }
     return invoice;

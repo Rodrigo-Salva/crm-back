@@ -9,15 +9,22 @@ export class ProductsService {
     return this.prisma.product.create({ data: { ...dto, tenantId } });
   }
 
-  async findAll(tenantId: string, category?: string, search?: string) {
+  async findAll(tenantId: string, categoryId?: string, search?: string) {
     const where: any = { tenantId };
-    if (category) where.category = category;
+    if (categoryId) where.categoryId = categoryId;
     if (search) where.name = { contains: search, mode: 'insensitive' };
-    return this.prisma.product.findMany({ where, orderBy: { name: 'asc' } });
+    return this.prisma.product.findMany({ 
+      where, 
+      include: { category: true },
+      orderBy: { name: 'asc' } 
+    });
   }
 
   async findById(id: string, tenantId: string) {
-    const product = await this.prisma.product.findFirst({ where: { id, tenantId } });
+    const product = await this.prisma.product.findFirst({ 
+      where: { id, tenantId },
+      include: { category: true },
+    });
     if (!product) throw new NotFoundException('Product not found');
     return product;
   }
@@ -30,15 +37,6 @@ export class ProductsService {
   async remove(id: string, tenantId: string) {
     await this.findById(id, tenantId);
     return this.prisma.product.delete({ where: { id } });
-  }
-
-  async getCategories(tenantId: string) {
-    const products = await this.prisma.product.findMany({
-      where: { tenantId, category: { not: null } },
-      select: { category: true },
-      distinct: ['category'],
-    });
-    return products.map((p) => p.category).filter(Boolean);
   }
 
   async createPriceList(dto: any, tenantId: string) {

@@ -17,11 +17,27 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
-  category?: string;
+  categoryId?: string;
 
   @IsString()
   @IsOptional()
   sku?: string;
+
+  @IsString()
+  @IsOptional()
+  type?: string;
+
+  @IsString()
+  @IsOptional()
+  billingType?: string;
+
+  @IsNumber()
+  @IsOptional()
+  stock?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  trackStock?: boolean;
 
   @IsOptional()
   @IsString()
@@ -47,11 +63,27 @@ export class UpdateProductDto {
 
   @IsString()
   @IsOptional()
-  category?: string;
+  categoryId?: string;
 
   @IsString()
   @IsOptional()
   sku?: string;
+
+  @IsString()
+  @IsOptional()
+  type?: string;
+
+  @IsString()
+  @IsOptional()
+  billingType?: string;
+
+  @IsNumber()
+  @IsOptional()
+  stock?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  trackStock?: boolean;
 
   @IsOptional()
   @IsString()

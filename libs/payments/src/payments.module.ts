@@ -4,9 +4,12 @@ import { PaymentsController } from './payments.controller';
 import { SharedModule } from '@crm/shared';
 import { RolePermissionsModule } from '@crm/role-permissions';
 import { WebhooksModule } from '@crm/webhooks';
+import { CommissionsModule } from '@crm/commissions';
+import { ReferralsModule } from '@crm/referrals';
+import { InvoicingModule } from '@crm/invoicing';
 
 @Module({
-  imports: [SharedModule, RolePermissionsModule, WebhooksModule],
+  imports: [SharedModule, RolePermissionsModule, WebhooksModule, CommissionsModule, ReferralsModule, InvoicingModule],
   providers: [PaymentsService],
   controllers: [PaymentsController],
   exports: [PaymentsService],

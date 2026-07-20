@@ -27,9 +27,11 @@ export class QuotesController {
     @Query('status') status: string,
     @Query('dateFrom') dateFrom: string,
     @Query('dateTo') dateTo: string,
+    @Query('leadId') leadId: string,
+    @Query('companyId') companyId: string,
     @CurrentUser() user: any,
   ) {
-    const filters = { search, status, dateFrom, dateTo };
+    const filters = { search, status, dateFrom, dateTo, leadId, companyId };
     return this.service.findAll(user.tenantId, user, filters);
   }
 

@@ -12,7 +12,7 @@ export class CampaignsController {
 
   @Post()
   create(@Body() dto: CreateCampaignDto, @CurrentUser() user: any) {
-    return this.service.create(dto, user.tenantId);
+    return this.service.create(dto, user.tenantId, user.id);
   }
 
   @Get()

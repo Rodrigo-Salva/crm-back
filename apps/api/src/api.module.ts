@@ -19,9 +19,17 @@ import { AuditModule } from '@crm/audit';
 import { CampaignsModule } from '@crm/campaigns';
 import { MarketingCampaignsModule } from '@crm/marketing-campaigns';
 import { SalesGoalsModule } from '@crm/sales-goals';
+import { CommissionsModule } from '@crm/commissions';
+import { ReferralsModule } from '@crm/referrals';
+import { SavedViewsModule } from '@crm/saved-views';
+import { InvoicingModule } from '@crm/invoicing';
+import { NpsModule } from '@crm/nps';
+import { TagsModule } from '@crm/tags';
 import { LeadFormsModule } from '@crm/lead-forms';
 import { DashboardModule } from '@crm/dashboard';
 import { ProductsModule } from '@crm/products';
+import { ProductCategoriesModule } from '@crm/product-categories';
+import { ProjectsModule } from '@crm/projects';
 import { QuotesModule } from '@crm/quotes';
 import { TicketsModule } from '@crm/tickets';
 import { ApiKeysModule } from '@crm/api-keys';
@@ -88,9 +96,17 @@ import { PublicApiModule } from '@crm/public-api';
     CampaignsModule,
     MarketingCampaignsModule,
     SalesGoalsModule,
+    CommissionsModule,
+    ReferralsModule,
+    SavedViewsModule,
+    InvoicingModule,
+    NpsModule,
+    TagsModule,
     LeadFormsModule,
     DashboardModule,
     ProductsModule,
+    ProductCategoriesModule,
+    ProjectsModule,
     QuotesModule,
     TicketsModule,
     ApiKeysModule,

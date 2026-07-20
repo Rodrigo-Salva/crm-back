@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '@crm/shared';
 import { EmailService } from '@crm/email';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
@@ -10,9 +12,10 @@ export class CampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    @InjectQueue('campaign-send') private readonly campaignSendQueue: Queue,
   ) {}
 
-  async create(dto: CreateCampaignDto, tenantId: string) {
+  async create(dto: CreateCampaignDto, tenantId: string, userId: string) {
     const body = dto.templateId
       ? (await this.prisma.emailTemplate.findUnique({ where: { id: dto.templateId } }))?.body || dto.body
       : dto.body;
@@ -24,6 +27,7 @@ export class CampaignsService {
         body,
         templateId: dto.templateId,
         tenantId,
+        createdById: userId,
         status: 'draft',
         totalRecipients: dto.leadIds.length,
         recipients: {
@@ -129,44 +133,22 @@ export class CampaignsService {
     if (campaign.status !== 'draft') throw new BadRequestException('Campaign already sent or sending');
 
     await this.prisma.campaign.update({ where: { id }, data: { status: 'sending' } });
+    await this.campaignSendQueue.add('send', { campaignId: id, tenantId });
 
-    let sent = 0;
-    for (const recipient of campaign.recipients) {
-      try {
-        await this.emailService.sendEmail(
-          { to: recipient.email, subject: campaign.subject, body: campaign.body },
-          tenantId,
-        );
-        await this.prisma.campaignRecipient.update({
-          where: { id: recipient.id },
-          data: { sent: true, sentAt: new Date() },
-        });
-        sent++;
-      } catch (err: any) {
-        this.logger.error(`Campaign send error for ${recipient.email}: ${err.message}`);
-        await this.prisma.campaignRecipient.update({
-          where: { id: recipient.id },
-          data: { error: err.message },
-        });
-      }
-    }
-
-    await this.prisma.campaign.update({
-      where: { id },
-      data: { status: 'sent', sentCount: sent, sentAt: new Date() },
-    });
-
-    return { message: 'Campaign sent', sent, total: campaign.recipients.length };
+    return { message: 'Campaña en cola para envío', total: campaign.recipients.length };
   }
 
   async getStats(id: string, tenantId: string) {
     const campaign = await this.findById(id, tenantId);
     const opened = campaign.recipients.filter((r) => r.opened).length;
+    const clicked = campaign.recipients.filter((r) => r.clicked).length;
     return {
       total: campaign.recipients.length,
       sent: campaign.recipients.filter((r) => r.sent).length,
       opened,
       openRate: campaign.recipients.length ? ((opened / campaign.recipients.length) * 100).toFixed(1) : '0',
+      clicked,
+      clickRate: campaign.recipients.length ? ((clicked / campaign.recipients.length) * 100).toFixed(1) : '0',
     };
   }
 }

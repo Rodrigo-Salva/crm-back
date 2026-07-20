@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { WebhooksService } from '@crm/webhooks';
+import { CommissionsService } from '@crm/commissions';
+import { ReferralsService } from '@crm/referrals';
+import { InvoicingService } from '@crm/invoicing';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 const PDFDocument = require('pdfkit');
 
@@ -9,6 +12,9 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooksService: WebhooksService,
+    private readonly commissions: CommissionsService,
+    private readonly referrals: ReferralsService,
+    private readonly invoicing: InvoicingService,
   ) {}
 
   async create(dto: CreatePaymentDto, userId: string, tenantId: string) {
@@ -46,10 +52,14 @@ export class PaymentsService {
 
     const totalPaid = quote.payments.reduce((sum, p) => sum + p.amount, 0) + dto.amount;
     if (totalPaid >= quote.grandTotal && quote.status !== 'converted') {
-      await this.prisma.quote.update({
+      const updatedQuote = await this.prisma.quote.update({
         where: { id: quote.id },
         data: { status: 'converted' }
       });
+      await this.webhooksService.emit('quote.converted', { ...updatedQuote, entity: 'quote', entityId: updatedQuote.id }, tenantId);
+      await this.commissions.calculateForQuote(updatedQuote, tenantId);
+      await this.referrals.calculateForQuote(updatedQuote, tenantId);
+      await this.invoicing.createForQuote(updatedQuote, tenantId);
     }
 
     return payment;

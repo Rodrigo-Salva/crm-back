@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsObject, IsIn, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsObject, IsIn, IsBoolean, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 const CONTACT_STATUSES = ['new', 'contacted', 'qualified', 'lost'];
@@ -100,6 +100,14 @@ export class CreateLeadDto {
   @IsString()
   @IsOptional()
   modalityId?: string;
+
+  @IsString()
+  @IsOptional()
+  subPhaseId?: string;
+
+  @IsString()
+  @IsOptional()
+  referredByLeadId?: string;
 }
 
 export class UpdateLeadDto {
@@ -200,6 +208,18 @@ export class UpdateLeadDto {
   @IsString()
   @IsOptional()
   modalityId?: string;
+
+  @IsString()
+  @IsOptional()
+  subPhaseId?: string | null;
+
+  @IsString()
+  @IsOptional()
+  referredByLeadId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isPartner?: boolean;
 }
 
 export class QueryLeadDto {
@@ -244,4 +264,8 @@ export class QueryLeadDto {
   @IsString()
   @IsOptional()
   modalityId?: string;
+
+  @IsString()
+  @IsOptional()
+  tagId?: string;
 }

@@ -130,6 +130,42 @@
       "@crm/sales-goals/*": [
         "libs/sales-goals/src/*"
       ],
+      "@crm/commissions": [
+        "libs/commissions/src"
+      ],
+      "@crm/commissions/*": [
+        "libs/commissions/src/*"
+      ],
+      "@crm/referrals": [
+        "libs/referrals/src"
+      ],
+      "@crm/referrals/*": [
+        "libs/referrals/src/*"
+      ],
+      "@crm/saved-views": [
+        "libs/saved-views/src"
+      ],
+      "@crm/saved-views/*": [
+        "libs/saved-views/src/*"
+      ],
+      "@crm/invoicing": [
+        "libs/invoicing/src"
+      ],
+      "@crm/invoicing/*": [
+        "libs/invoicing/src/*"
+      ],
+      "@crm/nps": [
+        "libs/nps/src"
+      ],
+      "@crm/nps/*": [
+        "libs/nps/src/*"
+      ],
+      "@crm/tags": [
+        "libs/tags/src"
+      ],
+      "@crm/tags/*": [
+        "libs/tags/src/*"
+      ],
       "@crm/lead-forms": [
         "libs/lead-forms/src"
       ],
@@ -147,6 +183,18 @@
       ],
       "@crm/products/*": [
         "libs/products/src/*"
+      ],
+      "@crm/product-categories": [
+        "libs/product-categories/src"
+      ],
+      "@crm/product-categories/*": [
+        "libs/product-categories/src/*"
+      ],
+      "@crm/projects": [
+        "libs/projects/src"
+      ],
+      "@crm/projects/*": [
+        "libs/projects/src/*"
       ],
       "@crm/quotes": [
         "libs/quotes/src"

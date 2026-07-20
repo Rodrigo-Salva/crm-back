@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@crm/shared';
 import { AutomationService } from '@crm/automation';
 import { AuditService } from '@crm/audit';
+import { TagsService } from '@crm/tags';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { QueryCompanyDto } from './dto/query-company.dto';
@@ -12,6 +13,7 @@ export class CompaniesService {
     private readonly prisma: PrismaService,
     private readonly automation: AutomationService,
     private readonly audit: AuditService,
+    private readonly tags: TagsService,
   ) {}
 
   async create(dto: CreateCompanyDto, ownerId: string, tenantId: string) {
@@ -31,7 +33,7 @@ export class CompaniesService {
   }
 
   async findAll(query: QueryCompanyDto, tenantId: string) {
-    const { search, page = 1, limit = 20 } = query;
+    const { search, tagId, page = 1, limit = 20 } = query;
     const where: any = { tenantId };
 
     if (search) {
@@ -39,6 +41,11 @@ export class CompaniesService {
         { name: { contains: search, mode: 'insensitive' } },
         { industry: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    if (tagId) {
+      const entityIds = await this.tags.entityIdsForTag('company', tagId, tenantId);
+      where.id = { in: entityIds };
     }
 
     const [data, total] = await Promise.all([

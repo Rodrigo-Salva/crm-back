@@ -73,6 +73,9 @@ export class EmailService {
     }
 
     const trackingId = uuidv4();
+    body = body.replace(/href=["'](https?:\/\/[^"']+)["']/gi,
+      (_match, url) => `href="${this.trackingUrl}/email/click/${trackingId}?url=${encodeURIComponent(url)}"`);
+
     const trackingPixel = `<img src="${this.trackingUrl}/email/track/${trackingId}.png" width="1" height="1" alt="" />`;
     body = body.replace('</body>', `${trackingPixel}</body>`);
     if (!body.includes('</body>')) body += trackingPixel;
@@ -122,6 +125,50 @@ export class EmailService {
       where: { trackingId, openedAt: null },
       data: { openedAt: new Date() },
     });
+
+    const recipient = await this.prisma.campaignRecipient.findUnique({ where: { trackingId } });
+    if (recipient && !recipient.opened) {
+      await this.prisma.campaignRecipient.update({
+        where: { id: recipient.id },
+        data: { opened: true, openedAt: new Date() },
+      });
+      await this.prisma.campaign.update({
+        where: { id: recipient.campaignId },
+        data: { openedCount: { increment: 1 } },
+      });
+    }
+  }
+
+  async trackClick(trackingId: string) {
+    await this.prisma.email.updateMany({
+      where: { trackingId, clickedAt: null },
+      data: { clickedAt: new Date() },
+    });
+
+    const recipient = await this.prisma.campaignRecipient.findUnique({ where: { trackingId } });
+    if (!recipient) return;
+
+    if (!recipient.opened) {
+      await this.prisma.campaign.update({
+        where: { id: recipient.campaignId },
+        data: { openedCount: { increment: 1 } },
+      });
+    }
+    if (!recipient.clicked) {
+      await this.prisma.campaign.update({
+        where: { id: recipient.campaignId },
+        data: { clickedCount: { increment: 1 } },
+      });
+    }
+    await this.prisma.campaignRecipient.update({
+      where: { id: recipient.id },
+      data: {
+        opened: true,
+        openedAt: recipient.openedAt ?? new Date(),
+        clicked: true,
+        clickedAt: new Date(),
+      },
+    });
   }
 
   async getHistory(tenantId: string, leadId?: string) {
@@ -149,5 +196,21 @@ export class EmailService {
       return this.sendEmail({ to: email, subject, body }, tenantId);
     }
     return { message: 'Email not sent (SMTP not configured for reset)' };
+  }
+
+  async sendNpsSurveyEmail(email: string, token: string, tenantId?: string) {
+    const surveyUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/nps/${token}`;
+    const subject = '¿Cómo fue tu experiencia?';
+    const body = `
+      <h2>Nos gustaría conocer tu opinión</h2>
+      <p>Ayúdanos a mejorar calificando tu experiencia reciente:</p>
+      <a href="${surveyUrl}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">Responder encuesta</a>
+      <p>Solo toma un minuto.</p>
+    `;
+
+    if (tenantId) {
+      return this.sendEmail({ to: email, subject, body }, tenantId);
+    }
+    return { message: 'Email not sent (SMTP not configured for NPS survey)' };
   }
 }

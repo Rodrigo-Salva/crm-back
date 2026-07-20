@@ -20,6 +20,10 @@ export class CreateCompanyDto {
   @IsOptional()
   address?: string;
 
+  @IsString()
+  @IsOptional()
+  ruc?: string;
+
   @IsObject()
   @IsOptional()
   customFields?: Record<string, any>;

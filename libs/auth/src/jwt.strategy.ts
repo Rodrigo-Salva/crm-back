@@ -29,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.isPortal) {
       const lead = await this.prisma.lead.findUnique({
         where: { id: payload.sub },
-        select: { id: true, name: true, email: true, tenantId: true },
+        select: { id: true, name: true, email: true, tenantId: true, isPartner: true },
       });
       if (!lead) throw new UnauthorizedException('Lead not found');
       return { ...lead, role: 'portal', isPortal: true };

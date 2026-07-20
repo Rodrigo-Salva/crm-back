@@ -4,6 +4,8 @@ import { AutomationService } from '@crm/automation';
 import { AuditService } from '@crm/audit';
 import { WebhooksService } from '@crm/webhooks';
 import { NotificationsService } from '@crm/notifications';
+import { TagsService } from '@crm/tags';
+import { NpsService } from '@crm/nps';
 
 @Injectable()
 export class TicketsService {
@@ -16,6 +18,8 @@ export class TicketsService {
     private readonly webhooks: WebhooksService,
     private readonly notifications: NotificationsService,
     private readonly realtime: RealtimeGateway,
+    private readonly tags: TagsService,
+    private readonly nps: NpsService,
   ) {}
 
   private async notifyAssignee(assignedTo: string, title: string, body: string, link: string) {
@@ -101,10 +105,14 @@ export class TicketsService {
     return ticket;
   }
 
-  async findAll(tenantId: string, status?: string, leadId?: string) {
+  async findAll(tenantId: string, status?: string, leadId?: string, tagId?: string) {
     const where: any = { tenantId };
     if (status) where.status = status;
     if (leadId) where.leadId = leadId;
+    if (tagId) {
+      const entityIds = await this.tags.entityIdsForTag('ticket', tagId, tenantId);
+      where.id = { in: entityIds };
+    }
     return this.prisma.ticket.findMany({
       where,
       include: {
@@ -152,6 +160,10 @@ export class TicketsService {
         updated.subject,
         `/tickets/${updated.id}`,
       );
+    }
+
+    if (dto.status && ['resolved', 'closed'].includes(dto.status) && dto.status !== before.status) {
+      try { await this.nps.createAndSendSurvey(id, tenantId); } catch {}
     }
 
     return updated;

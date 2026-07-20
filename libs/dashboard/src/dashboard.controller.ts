@@ -4,6 +4,7 @@ import { CurrentUser } from '@crm/auth';
 import { PermissionsGuard } from '@crm/role-permissions';
 import { DashboardService } from './dashboard.service';
 import { ExportService } from './export.service';
+import { NpsService } from '@crm/nps';
 import type { Response } from 'express';
 
 @Controller('dashboard')
@@ -12,7 +13,13 @@ export class DashboardController {
   constructor(
     private readonly service: DashboardService,
     private readonly exportService: ExportService,
+    private readonly nps: NpsService,
   ) {}
+
+  @Get('nps')
+  getNps(@CurrentUser() user: any) {
+    return this.nps.getStats(user.tenantId);
+  }
 
   @Get('summary')
   getSummary(
@@ -26,6 +33,11 @@ export class DashboardController {
   @Get('pipeline')
   getPipeline(@CurrentUser() user: any) {
     return this.service.getPipelineStages(user.tenantId);
+  }
+
+  @Get('account-health')
+  getAccountHealth(@CurrentUser() user: any) {
+    return this.service.getAccountHealth(user.tenantId);
   }
 
   @Get('deals-by-stage')

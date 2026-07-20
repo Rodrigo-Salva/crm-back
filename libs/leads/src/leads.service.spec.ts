@@ -86,7 +86,9 @@ describe('LeadsService', () => {
 
       await service.create({ name: 'Ana', status: 'Negociación' } as any, 'owner-1', 'tenant-1');
 
-      expect(prisma.pipelineStage.findFirst).not.toHaveBeenCalled();
+      expect(prisma.pipelineStage.findFirst).not.toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { order: 'asc' } }),
+      );
       expect(prisma.lead.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: 'Negociación' }) }),
       );

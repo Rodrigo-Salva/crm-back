@@ -21,11 +21,11 @@ export class TicketsController {
 
   @Get()
   @ApiOperation({ summary: 'Lista tickets (filtrados por estado)' })
-  findAll(@Query('status') status: string, @CurrentUser() user: any) {
+  findAll(@Query('status') status: string, @Query('tagId') tagId: string, @CurrentUser() user: any) {
     if (user.isPortal) {
       return this.service.findAll(user.tenantId, status, user.id);
     }
-    return this.service.findAll(user.tenantId, status);
+    return this.service.findAll(user.tenantId, status, undefined, tagId);
   }
 
   @Get('sla')

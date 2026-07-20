@@ -179,17 +179,19 @@ export class SchedulerService implements OnModuleInit {
             tenantId: tenant.id,
             status: { in: ['pending', 'sent'] },
             dueDate: { lt: now },
+            subscriptionId: { not: null },
           },
           include: { subscription: { include: { contract: { include: { lead: true } } } } },
         });
 
         for (const invoice of newlyOverdueInvoices) {
           await this.prisma.invoice.update({ where: { id: invoice.id }, data: { status: 'overdue' } });
+          const subscription = invoice.subscription!;
           await this.notificationsService.create({
-            userId: invoice.subscription.contract.createdById,
+            userId: subscription.contract.createdById,
             title: 'Factura vencida',
-            body: `La factura ${invoice.number} de ${invoice.subscription.contract.lead.name} está vencida.`,
-            link: `/contracts/${invoice.subscription.contractId}`,
+            body: `La factura ${invoice.number} de ${subscription.contract.lead.name} está vencida.`,
+            link: `/contracts/${subscription.contractId}`,
           });
         }
 
@@ -228,13 +230,13 @@ export class SchedulerService implements OnModuleInit {
 
   private async runDunning(tenantId: string, now: Date) {
     const overdueInvoices = await this.prisma.invoice.findMany({
-      where: { tenantId, status: 'overdue' },
+      where: { tenantId, status: 'overdue', subscriptionId: { not: null } },
       include: { subscription: { include: { contract: { include: { lead: true } } } } },
     });
 
     for (const invoice of overdueInvoices) {
       const daysOverdue = Math.floor((now.getTime() - invoice.dueDate.getTime()) / (24 * 3600000));
-      const subscription = invoice.subscription;
+      const subscription = invoice.subscription!;
       const lead = subscription.contract.lead;
 
       if (daysOverdue >= SchedulerService.DUNNING_CANCEL_AFTER_DAYS) {

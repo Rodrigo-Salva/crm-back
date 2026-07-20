@@ -17,11 +17,15 @@ export class CreateQuoteDto {
   items: {
     productId?: string;
     description: string;
+    section?: string;
     quantity: number;
     unitPrice: number;
     discountPercent?: number;
     currency?: string;
   }[];
+
+  @IsOptional()
+  requiresSignature?: boolean;
 
   @IsNumber()
   @IsOptional()

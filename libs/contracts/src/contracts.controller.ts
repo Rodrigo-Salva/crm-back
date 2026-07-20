@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -22,8 +22,8 @@ export class ContractsController {
 
   @Get()
   @ApiOperation({ summary: 'Lista contratos' })
-  findAll(@CurrentUser() user: any) {
-    return this.service.findAll(user.tenantId, user);
+  findAll(@Query('leadId') leadId: string, @Query('companyId') companyId: string, @CurrentUser() user: any) {
+    return this.service.findAll(user.tenantId, user, { leadId, companyId });
   }
 
   @Get(':id')

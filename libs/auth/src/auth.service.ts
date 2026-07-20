@@ -279,7 +279,7 @@ export class AuthService {
       isPortal: true,
     });
 
-    return { contact: { id: lead.id, name: lead.name, email: lead.email }, token };
+    return { contact: { id: lead.id, name: lead.name, email: lead.email, isPartner: lead.isPartner }, token };
   }
 
   async togglePortalAccess(leadId: string, dto: { password?: string; enable: boolean }, tenantId: string) {

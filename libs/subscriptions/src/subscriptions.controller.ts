@@ -10,8 +10,11 @@ export class SubscriptionsController {
   constructor(private readonly service: SubscriptionsService) {}
 
   @Get()
-  findByContract(@Query('contractId') contractId: string, @CurrentUser() user: any) {
-    return this.service.findByContract(contractId, user.tenantId);
+  find(@Query('contractId') contractId: string, @CurrentUser() user: any) {
+    if (contractId) {
+      return this.service.findByContract(contractId, user.tenantId);
+    }
+    return this.service.findAllSubscriptions(user.tenantId);
   }
 
   @Get(':id')

@@ -162,6 +162,9 @@ export class AutomationService {
       case 'assign_round_robin':
         await this.handleRoundRobin(payload, tenantId, config);
         break;
+      case 'assign_workload':
+        await this.handleWorkloadAssignment(payload, tenantId, config);
+        break;
       case 'create_task':
         await this.handleCreateTask(payload, tenantId, config);
         break;
@@ -176,31 +179,26 @@ export class AutomationService {
     }
   }
 
-  private async handleRoundRobin(payload: any, tenantId: string, config: any) {
+  private async resolveAssignmentPool(tenantId: string, config: any) {
+    if (config?.teamId) {
+      const members = await this.prisma.teamMember.findMany({
+        where: { teamId: config.teamId, user: { tenantId } },
+        include: { user: { select: { id: true, createdAt: true } } },
+        orderBy: { user: { createdAt: 'asc' } },
+      });
+      return { poolKey: `team:${config.teamId}`, users: members.map((m) => m.user) };
+    }
+
     const role = config?.role || 'seller';
     const users = await this.prisma.user.findMany({
       where: { tenantId, role },
       orderBy: { createdAt: 'asc' },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
-    if (users.length === 0) return;
+    return { poolKey: `role:${role}`, users };
+  }
 
-    const targetEntity = payload.entity;
-    const targetId = payload.entityId;
-
-    const lastAssignment = await this.prisma.auditLog.findFirst({
-      where: { tenantId, entity: targetEntity, action: 'assigned' },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const changes = (lastAssignment?.changes ?? {}) as any;
-    const lastAssigneeId = (changes as any)?.assigneeId;
-    const lastIndex = lastAssigneeId
-      ? users.findIndex((u) => u.id === lastAssigneeId)
-      : -1;
-    const nextIndex = (lastIndex + 1) % users.length;
-    const assigneeId = users[nextIndex].id;
-
+  private async assignLead(targetEntity: string, targetId: string, assigneeId: string, tenantId: string) {
     if (targetEntity === 'lead') {
       await this.prisma.lead.update({
         where: { id: targetId },
@@ -214,6 +212,60 @@ export class AutomationService {
         changes: { assigneeId }, tenantId, userId: assigneeId,
       },
     });
+  }
+
+  private async handleRoundRobin(payload: any, tenantId: string, config: any) {
+    const { poolKey, users } = await this.resolveAssignmentPool(tenantId, config);
+    if (users.length === 0) return;
+
+    const cursor = await this.prisma.automationAssignmentCursor.findUnique({
+      where: { tenantId_poolKey: { tenantId, poolKey } },
+    });
+
+    const lastIndex = cursor?.lastUserId
+      ? users.findIndex((u) => u.id === cursor.lastUserId)
+      : -1;
+    const nextIndex = (lastIndex + 1) % users.length;
+    const assigneeId = users[nextIndex].id;
+
+    await this.prisma.automationAssignmentCursor.upsert({
+      where: { tenantId_poolKey: { tenantId, poolKey } },
+      create: { tenantId, poolKey, lastUserId: assigneeId },
+      update: { lastUserId: assigneeId },
+    });
+
+    await this.assignLead(payload.entity, payload.entityId, assigneeId, tenantId);
+  }
+
+  private async handleWorkloadAssignment(payload: any, tenantId: string, config: any) {
+    const { users } = await this.resolveAssignmentPool(tenantId, config);
+    if (users.length === 0) return;
+
+    const openStages = await this.prisma.pipelineStage.findMany({
+      where: { tenantId, isWon: false, isLost: false },
+      select: { name: true },
+    });
+    const openStageNames = openStages.map((s) => s.name);
+    const candidateIds = users.map((u) => u.id);
+
+    const counts = await this.prisma.lead.groupBy({
+      by: ['ownerId'],
+      where: { tenantId, ownerId: { in: candidateIds }, status: { in: openStageNames } },
+      _count: true,
+    });
+    const countByUser = new Map(counts.map((c) => [c.ownerId, c._count]));
+
+    let assigneeId = candidateIds[0];
+    let lowest = countByUser.get(assigneeId) ?? 0;
+    for (const id of candidateIds) {
+      const count = countByUser.get(id) ?? 0;
+      if (count < lowest) {
+        lowest = count;
+        assigneeId = id;
+      }
+    }
+
+    await this.assignLead(payload.entity, payload.entityId, assigneeId, tenantId);
   }
 
   private async handleCreateTask(payload: any, tenantId: string, config: any) {

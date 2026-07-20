@@ -4,9 +4,10 @@ import { SubscriptionsController } from './subscriptions.controller';
 import { InvoicesController } from './invoices.controller';
 import { RolePermissionsModule } from '@crm/role-permissions';
 import { NotificationsModule } from '@crm/notifications';
+import { InvoicingModule } from '@crm/invoicing';
 
 @Module({
-  imports: [RolePermissionsModule, NotificationsModule],
+  imports: [RolePermissionsModule, NotificationsModule, InvoicingModule],
   controllers: [SubscriptionsController, InvoicesController],
   providers: [SubscriptionsService],
   exports: [SubscriptionsService],

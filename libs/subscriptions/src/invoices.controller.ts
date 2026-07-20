@@ -17,7 +17,7 @@ export class InvoicesController {
     if (user.isPortal) {
       return this.service.findInvoicesForLead(user.id, user.tenantId);
     }
-    return [];
+    return this.service.findAllInvoices(user.tenantId);
   }
 
   @Get(':id')

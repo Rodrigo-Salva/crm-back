@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, IsHexColor, IsBoolean } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsHexColor, IsBoolean, Min } from 'class-validator';
 
 export class CreatePipelineStageDto {
   @IsString()
@@ -19,4 +19,9 @@ export class CreatePipelineStageDto {
   @IsBoolean()
   @IsOptional()
   isLost?: boolean;
+
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  maxLeads?: number;
 }
